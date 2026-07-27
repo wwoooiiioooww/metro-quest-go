@@ -281,9 +281,14 @@ console.log('\n[5] 注意事項パネル');
   const seen = { settings:null, spinsLeft:null, excluded:[], history:[], totalMoney:0, pin:null, noticeSeen:true };
   const { w } = boot({ mqgo_v1: JSON.stringify(seen) });
   eq(w.eval('typeof openNoticeFromSettings'), 'function', '設定から開く関数がある');
+  w.prompt = () => '1234';
+  w.eval('switchTab("set")');
   w.eval('openNoticeFromSettings()');
   eq(w.document.getElementById('notice').style.display, 'block', '設定から読み返せる');
-  eq(w.document.getElementById('settings').style.display, 'none', 'そのとき設定は閉じる');
+  /* 注意書きは全画面オーバーレイなので、背後の設定タブは開いたままでよい。
+     とじたら元の設定タブに戻ること */
+  w.eval('closeNotice()');
+  ok(w.document.getElementById('tab-set').classList.contains('on'), 'とじると元の設定タブに戻る');
   w.close();
 }
 {
@@ -545,6 +550,125 @@ console.log('\n[15] ★ → ⭐ の移行');
   eq(w.eval('settings.stamps').length, 2, '自作の表は件数ごと保持される');
   eq(w.eval('settings.stamps')[0].label, 'にく1こ', '自作のラベルも保持される');
   w.close();
+}
+
+
+/* ---------- 16. 画面下タブ ---------- */
+console.log('\n[16] 画面下タブ');
+{
+  const { w, errors } = boot();
+  ok(w.document.getElementById('tabbar'), 'タブバーがある');
+  eq(w.document.querySelectorAll('#tabbar button').length, 3, 'タブは3つ');
+  ok(w.document.getElementById('tab-play').classList.contains('on'), '起動時は「あそぶ」タブ');
+  w.eval('switchTab("log")');
+  ok(w.document.getElementById('tab-log').classList.contains('on'), 'きろくタブに切り替わる');
+  eq(w.document.querySelectorAll('.tab-pane.on').length, 1, '同時に開くのは1つだけ');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  const { w } = boot();
+  w.prompt = () => '9999';
+  w.eval('switchTab("set")');
+  ok(!w.document.getElementById('tab-set').classList.contains('on'), '違うあいことばでは開かない');
+  w.prompt = () => '1234';
+  w.eval('switchTab("set")');
+  ok(w.document.getElementById('tab-set').classList.contains('on'), '正しいあいことばで開く');
+  w.close();
+}
+{
+  /* 注意書きはタブ構成でも設定から開ける */
+  const seen = { settings:null, spinsLeft:null, excluded:[], history:[], totalMoney:0, pin:null, noticeSeen:true };
+  const { w } = boot({ mqgo_v1: JSON.stringify(seen) });
+  w.prompt = () => '1234';
+  w.eval('switchTab("set")');
+  w.eval('openNoticeFromSettings()');
+  eq(w.document.getElementById('notice').style.display, 'block', '設定から注意書きを開ける');
+  w.close();
+}
+
+/* ---------- 17. 指令リストの行編集 ---------- */
+console.log('\n[17] 指令リストの行編集');
+{
+  const { w, errors } = boot();
+  w.eval('renderMissionEditor()');
+  const rows = w.document.querySelectorAll('#mission-editor .edit-row');
+  eq(rows.length, w.eval('DEFAULT_MISSIONS.length'), `初期指令がすべて出る (${rows.length}件)`);
+  ok(!/<textarea id="mission-editor"/.test(html), 'テキストエリアではなくなっている');
+
+  w.eval('editMission(0, "テスト指令にへんこう")');
+  eq(w.eval('settings.missions[0]'), 'テスト指令にへんこう', '1行だけ書きかえられる');
+
+  const before = w.eval('settings.missions.length');
+  w.eval('addMissionRow()');
+  eq(w.eval('settings.missions[0]'), 'あたらしい指令', '追加した指令は先頭に入る');
+  w.eval('delMission(0)');
+  eq(w.eval('settings.missions.length'), before, '指令を削除できる');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  const { w, alerts } = boot();
+  w.eval('settings.missions = ["ひとつだけ"]');
+  w.eval('renderMissionEditor()');
+  w.eval('delMission(0)');
+  eq(w.eval('settings.missions.length'), 1, '最後の1件は削除できない');
+  ok(alerts.some(a => a.includes('最低1つ')), '理由が伝わる');
+  w.close();
+}
+{
+  const { w } = boot();
+  w.eval('settings.missions = ["のこす", "   ", ""]');
+  w.eval('saveSettings()');
+  eq(w.eval('settings.missions.length'), 1, '空白だけの指令は保存時に落ちる');
+  w.close();
+}
+{
+  const { w } = boot();
+  w.eval('settings.missions = [' + JSON.stringify('"あぶない"<b>指令') + ']');
+  w.eval('renderMissionEditor()');
+  eq(w.document.querySelector('#mission-editor input').value, '"あぶない"<b>指令', '引用符やタグでも壊れない');
+  w.close();
+}
+
+
+/* ---------- 18. 保護者モードのロック ---------- */
+console.log('\n[18] 保護者モードのロック');
+{
+  const { w, alerts, errors } = boot();
+  w.prompt = () => '1234';
+  w.eval('switchTab("set")');
+  eq(w.eval('parentAuthed'), true, 'あいことばを通すと認証済みになる');
+
+  w.eval('lockParent()');
+  eq(w.eval('parentAuthed'), false, 'ロックで認証が外れる');
+  ok(w.document.getElementById('tab-play').classList.contains('on'), 'ロックすると「あそぶ」タブへ戻る');
+  ok(alerts.some(a => a.includes('ロック')), 'ロックしたことがユーザーに伝わる');
+
+  /* 子どもが設定を開こうとしても、あいことばを聞かれる */
+  let asked = 0;
+  w.prompt = () => { asked++; return null; };
+  w.eval('switchTab("set")');
+  eq(asked, 1, 'ロック後はあいことばを聞かれる');
+  ok(!w.document.getElementById('tab-set').classList.contains('on'), 'あいことばなしでは開けない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 端末を渡したまま放置される事故を防ぐ自動ロック */
+  const { w, errors } = boot();
+  w.prompt = () => '1234';
+  w.eval('switchTab("set")');
+  eq(w.eval('parentAuthed'), true, '認証済みの状態をつくる');
+  Object.defineProperty(w.document, 'visibilityState', { value: 'hidden', configurable: true });
+  w.document.dispatchEvent(new w.Event('visibilitychange'));
+  eq(w.eval('parentAuthed'), false, 'アプリが背面に回ると自動でロックされる');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  ok(/id="lock-btn"/.test(html), 'ロックボタンが設置されている');
+  ok(/lockParent\(\)/.test(html), 'ロックボタンから lockParent が呼ばれる');
 }
 
 /* ---------- 結果 ---------- */

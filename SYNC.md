@@ -19,8 +19,8 @@
 | # | 箇所 | 家族版 `metro-quest` | 配布版 `metro-quest-go` | 理由 |
 |---|---|---|---|---|
 | 1 | `APP_KEY` | `'mq_v1'` | `'mqgo_v1'` | GitHub Pagesでは両者が**同一オリジン**。キーが同じだとデータを共有してしまう |
-| 2 | `CACHE_NAME` (sw.js) | `'metro-quest-v8'` | `'metro-quest-go-v4'` | 同上。Cache Storageもオリジン単位 |
-| 3 | `APP_VER` | `'v8'` | `'v4'` | 別アプリとして採番。`CACHE_NAME` と必ず揃える |
+| 2 | `CACHE_NAME` (sw.js) | `'metro-quest-v9'` | `'metro-quest-go-v5'` | 同上。Cache Storageもオリジン単位 |
+| 3 | `APP_VER` | `'v9'` | `'v5'` | 別アプリとして採番。`CACHE_NAME` と必ず揃える |
 | 4 | `migrateLegacy()` | **あり** | **なし（意図的）** | 配布版が旧キー（`questHistory` 等）を拾うと、**家族版のデータを取り込んでしまう** |
 | 5 | `LEGACY_KEYS` | あり | なし | 同上 |
 | 6 | `TARGET` | なし | `{ companies:['metro'], strict:false }` | 配布先ごとの初期路線の切り替え |
@@ -50,10 +50,9 @@
 | 30 | `rewardValue()` | なし | 数字がなければ★⭐の数を数える | 29に対応 |
 | 31 | `history[].mode` | なし | あり（`stamp` / `money`） | 今日の合計で★と円を足し合わせないため |
 | 32 | `todayStats()` | 日付のみで集計 | 日付＋モードで集計 | 31に対応 |
-| 33 | **画面構成** | **画面下タブ3つ**（あそぶ/きろく/せってい） | 1画面スクロール | 家族版のみバッチ2で刷新。GOはバッチ3で作り直すため据え置き |
-| 34 | 指令リストの編集 | **1行1入力の行編集**（＋追加/✕削除） | テキストエリア（1行=1つ） | 33に対応。GOもバッチ3で揃える |
-| 35 | `switchTab()` / `parentAuthed` | あり | なし（`openSettings()` のまま） | 33に対応 |
-| 36 | `legacyStampsV2()` / `isUnedited()` | なし | あり | 未編集の★表を⭐へ差し替えるため |
+| 33 | 画面下タブのアイコン | 🎰 あそぶ | 🚇 あそぶ | 遊技の記号を使わない |
+| 34 | `legacyStampsV2()` / `isUnedited()` | なし | あり | 未編集の★表を⭐へ差し替えるため |
+| 35 | `openNoticeFromSettings()` | なし | あり | 「はじめる前に」を設定から読み返すため |
 
 ### 共通化された箇所（両方に同じものが入っている）
 
@@ -68,6 +67,9 @@
 - `updatePcts()` と重みエディタの%表示 … 「合計100が上限」という誤解の解消
 - 入力欄の `<form autocomplete="off">` 包み・`name`属性・`parent-code` へのid変更
 - **駅名の自由入力欄の廃止**（Androidの自動入力バーは属性では抑止できなかった。路線→駅チップの導線に一本化）
+- **画面下タブ**（あそぶ/きろく/せってい）と `switchTab()` / `parentAuthed`
+- **指令リストの行編集**（`renderMissionEditor()` / `addMissionRow()` / `delMission()`）
+- **保護者モードのロック**（`lockParent()` と、背面移行時の自動ロック）
 
 ---
 
