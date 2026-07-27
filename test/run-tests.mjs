@@ -689,7 +689,8 @@ console.log('\n[19] 運転台');
   eq(w.eval('cabState'), 'cruise', '巡航に移れる');
   ok(root().getPropertyValue('--spd') !== '0s', '巡航中は車窓が流れる');
   eq(root().getPropertyValue('--kmh'), '78', '巡航の速度計');
-  eq(w.document.getElementById('cab-view').className, 'cruise', '車窓に状態クラスが付く');
+  ok(w.document.getElementById('cab-view').className.split(' ').includes('cruise'), '車窓に状態クラスが付く');
+  ok(/sc-/.test(w.document.getElementById('cab-view').className), '状態クラスと景色クラスが併記される');
 
   w.eval('setCab("arriving")');
   eq(root().getPropertyValue('--kmh'), '12', '到着時は減速している');
@@ -815,6 +816,128 @@ console.log('\n[22] idの回帰防止');
   ok(w.document.getElementById('clear-btn'), '達成ボタンのidが変わっていない');
   ok(w.document.getElementById('reel-label-2'), 'ごほうびのラベルidが変わっていない');
   ok(w.document.getElementById('bonus-msg'), 'ボーナス表示のidが変わっていない');
+  w.close();
+}
+
+
+/* ---------- 23. 景色 ---------- */
+console.log('\n[23] 景色');
+{
+  const { w, errors } = boot();
+  const scenes = w.eval('SCENES');
+  eq(scenes.length, 4, '景色は4種類');
+  ok(scenes.every(s => /^sc-/.test(s.cls) && s.tag.length > 0), '各景色にクラスとラベルがある');
+  ok(scenes.some(s => s.cls === 'sc-sky'), '青空がある');
+  ok(scenes.some(s => s.cls === 'sc-rain'), '雨がある');
+  ok(scenes.some(s => s.cls === 'sc-under'), '地下がある');
+
+  /* 景色ごとに壁・天井・床の色が定義されていること（暗くて見えない問題の再発防止） */
+  for (const s of scenes) {
+    ok(new RegExp('\\.' + s.cls + ' \\.tunnel').test(html),  s.tag + ' の壁の色がある');
+    ok(new RegExp('\\.' + s.cls + ' \\.ceiling').test(html), s.tag + ' の天井の色がある');
+    ok(new RegExp('\\.' + s.cls + ' \\.floor').test(html),   s.tag + ' の床の色がある');
+    ok(new RegExp('#cab-view\\.' + s.cls + ' \\{').test(html), s.tag + ' の背景色がある');
+  }
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 発車のたびに景色が選び直される */
+  const { w } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  const seen = new Set();
+  for (let i = 0; i < 40; i++) { w.eval('pickScene()'); seen.add(w.eval('curScene.cls')); }
+  ok(seen.size >= 3, `乗るたびに景色が変わる (40回で${seen.size}種類)`);
+  ok(w.document.getElementById('scene-tag').textContent.length > 0, '景色のラベルが出る');
+  w.close();
+}
+
+/* ---------- 24. ブレーキ1本で順番に止める ---------- */
+console.log('\n[24] ブレーキは1本');
+{
+  const { w, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  const rowOf = i => w.document.getElementById('reel-' + i).closest('.reel-row');
+
+  ok(w.document.getElementById('brake-btn'), '大きなブレーキが1本ある');
+  eq(w.document.getElementById('brake-btn').disabled, true, '停車中は押せない');
+
+  w.eval('startAll()');
+  eq(w.document.getElementById('brake-btn').disabled, false, '発車したら押せる');
+  eq(w.eval('activeReel'), 0, '最初は行き先から');
+  ok(rowOf(0).classList.contains('active'), '行き先だけが大きく出る');
+  ok(rowOf(1).classList.contains('pending'), 'まだの項目は隠れている(縦に伸びない)');
+  ok(rowOf(3).classList.contains('pending'), '4つ目も隠れている');
+  ok(w.document.getElementById('brake-label').textContent.includes('行き先'), '何を止めるのか分かる');
+
+  w.eval('pullBrake()');
+  eq(w.eval('activeReel'), 1, 'ブレーキで次の項目へ進む');
+  ok(rowOf(0).classList.contains('done'), '確定した項目は畳まれる');
+  ok(rowOf(1).classList.contains('active'), '次の項目が大きくなる');
+  ok(w.document.getElementById('brake-label').textContent.includes('指令'), 'ラベルも追従する');
+
+  w.eval('pullBrake()'); w.eval('pullBrake()'); w.eval('pullBrake()');
+  eq(w.eval('runningCount()'), 0, '4回で全部止まる');
+  eq(w.document.getElementById('brake-btn').disabled, true, '止まったら押せない');
+  for (let i = 0; i < 4; i++) ok(rowOf(i).classList.contains('done'), `最後は${i}番も畳まれる`);
+  ok(w.eval('currentResult.station').length > 0, '行き先が決まっている');
+  ok(w.eval('currentResult.target').length > 0, 'だれが決まっている');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 個別のブレーキは隠したがidは残っている（既存テストと互換） */
+  ok(/\.stop-btn \{ display:none; \}/.test(html), '個別ブレーキは非表示になっている');
+  const { w } = boot();
+  for (let i = 0; i < 4; i++) ok(w.document.getElementById('stop-' + i), 'stop-' + i + ' のidは残っている');
+  w.close();
+}
+{
+  /* 止まっている表示器を指していても、残っているものへ回復する */
+  const { w } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.eval('startAll()');
+  w.eval('stopReel(0)');
+  w.eval('activeReel = 0');        // わざと止まった番号を指す
+  w.eval('pullBrake()');
+  eq(w.eval('runningCount()'), 2, '止まっている番号を指していても、残りを止められる');
+  w.close();
+}
+
+/* ---------- 25. お地蔵さんが車窓に出る ---------- */
+console.log('\n[25] お地蔵さん');
+{
+  const { w, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  const j = w.document.getElementById('jizo');
+  ok(j, 'お地蔵さんの要素が車窓の中にある');
+  ok(w.document.getElementById('cab-view').contains(j), '車窓の内側に置かれている');
+  eq(j.classList.contains('on'), false, '普段は出ていない');
+  w.eval('showJizo()');
+  eq(j.classList.contains('on'), true, 'ボーナスで車窓を横切る');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 演出OFFのときは動かさない */
+  const { w } = boot();
+  w.eval('settings.motion = false');
+  w.eval('showJizo()');
+  eq(w.document.getElementById('jizo').classList.contains('on'), false, '演出OFFなら動かさない');
+  w.close();
+}
+
+/* ---------- 26. 画面の高さ ---------- */
+console.log('\n[26] 縦の圧縮');
+{
+  ok(!/id="gear-btn"/.test(html), '⚙️ボタンを削除した(タブと重複していた)');
+  ok(!/id="notice-btn"/.test(html), '注意書きボタンをせっていへ移した');
+  const { w } = boot();
+  /* あそぶタブに常時見えている主要ブロックの数を抑える */
+  const play = w.document.getElementById('tab-play');
+  const rows = play.querySelectorAll('.reel-row:not(.pending)');
+  ok(rows.length <= 4, '表示器は最大4行');
+  ok(w.document.getElementById('app-ver').closest('#tab-set'), 'バージョン表示はせっていタブへ移動');
   w.close();
 }
 
