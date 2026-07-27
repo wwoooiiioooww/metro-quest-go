@@ -1,0 +1,111 @@
+地下鉄クエスト・ルーレット (Metro Quest GO) — 利用条件
+Copyright (c) 2026 wwoooiiioooww
+https://github.com/wwoooiiioooww/metro-quest-go
+
+このソフトウェアの著作権は上記の作者に帰属します。
+そのうえで、以下のとおり ゆるやかに使っていただけます。
+
+
+■ 自由にしていただいてよいこと
+
+・個人・家庭内での利用は自由です。
+  ご家族やお友だちのご家庭にすすめていただくのも歓迎です。
+・ご自身のご家庭に合わせて中身を書きかえて使うのも自由です。
+・ソースコードを読んで、学んだり参考にしたりするのも自由です。
+
+
+■ 鉄道事業者・公共交通機関・自治体・教育機関の皆さまへ
+
+・非営利での配布・紹介（イベント配布、案内ページからのリンク、
+  QRコードの掲示、館内・車内での紹介など）は歓迎いたします。
+  事前にご一報いただければ、その範囲で許諾いたします。
+  費用は一切いただきません。
+・貴社・貴団体の路線のみを収録した版や、名称・配色・
+  対象エリアを調整した版のご用意も可能です。ご相談ください。
+・「非営利」の判断に迷われる場合も、まずはご連絡ください。
+  上記リポジトリのIssue、または作者までお願いいたします。
+
+
+■ 再配布・公開するときのお願い
+
+・上記の著作権表示と、このファイルを いっしょに残してください。
+・書きかえたものを公開する場合は、オリジナルそのものではないことが
+  わかるようにしてください（名前を変える、変更点を書き添える等）。
+・「自分がゼロから作ったもの」としての公開は ご遠慮ください。
+
+
+■ ご相談いただきたいこと
+
+・商用利用（有償での販売・配布、広告収益をともなう公開など）は、
+  事前に上記リポジトリまでご連絡ください。基本的にはお断りしません。
+
+
+■ 商標・権利表示について
+
+・本アプリに登場する路線名・駅名は、行き先を示すための事実表記です。
+・各鉄道事業者のロゴ、シンボルマーク、駅ナンバリング記号、
+  路線図等の図版は一切使用していません。
+・路線を色分けする配色は、利用者が路線を見分けるための便宜的な
+  ものです。各事業者のCI/VI規定に基づく正式な色ではありません。
+  ご指摘があれば速やかに変更いたします。
+・本アプリは個人が趣味で制作した非公式のものであり、
+  いかなる鉄道事業者・企業・団体とも関係ありません。
+
+
+■ 無保証
+
+本ソフトウェアは現状のまま提供されます。
+正確性・有用性・特定目的への適合性について、いかなる保証もありません。
+利用によって生じたいかなる損害についても、作者は責任を負いません。
+
+※ 本アプリは屋外での移動をともなう遊びを提案します。
+   お子さまのご利用には必ず保護者の方がご同伴ください。
+   事故・怪我・トラブルについて、作者は責任を負いません。
+
+※ 本アプリは外部との通信を一切行わず、利用者の情報を
+   収集・送信しません。記録は端末内にのみ保存されます。
+
+
+────────────────────────────────────────
+
+Metro Quest GO — Terms of Use
+Copyright (c) 2026 wwoooiiioooww
+https://github.com/wwoooiiioooww/metro-quest-go
+
+All rights reserved by the author, with the following permissions granted:
+
+You MAY:
+  - Use this software freely for personal and family purposes.
+  - Modify it for your own family's use.
+  - Read and learn from the source code.
+
+For railway operators, public transit agencies, municipalities and
+schools:
+  - Non-commercial distribution or referral (event handouts, links from
+    an information page, posted QR codes, in-station or in-car
+    introductions) is welcome. Please notify the author in advance;
+    permission is granted for that scope at no cost.
+  - Customized editions (your lines only, adjusted naming, colors or
+    target area) can be prepared on request.
+
+If you redistribute or publish it, please:
+  - Keep this copyright notice and license file intact.
+  - Make clear that a modified version is not the original.
+  - Do not present it as your own original work.
+
+Please ask first for:
+  - Commercial use (paid distribution, ad-supported publishing, etc.).
+    Requests are generally welcome.
+
+TRADEMARKS:
+  Line and station names appear as factual destination labels. No
+  operator logos, symbol marks, station-numbering marks or route-map
+  artwork are used. Line colors are a convenience for telling lines
+  apart and are not official CI/VI colors. This is an unofficial
+  hobby project with no affiliation to any railway operator or company.
+
+NO WARRANTY:
+  This software is provided "as is", without warranty of any kind.
+  The author is not liable for any damages arising from its use,
+  including any incident occurring during outdoor play. Children must
+  be accompanied by a guardian.
