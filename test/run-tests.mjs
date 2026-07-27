@@ -80,7 +80,7 @@ console.log('\n[2] 家族版との分離');
 
   /* 一通り操作しても家族版を壊さない */
   w.eval('addExclude("渋谷")');
-  w.document.getElementById('new-pin').value = '5555';
+  w.document.getElementById('parent-code').value = '5555';
   w.eval('changePin()');
   eq(JSON.parse(w.localStorage.getItem('mq_v1')).totalMoney, 8000, '家族版のmq_v1を書き換えない');
   eq(w.localStorage.getItem('questHistory'), '[{"station":"旧データ"}]', '旧キーにも書き戻さない');
@@ -196,13 +196,13 @@ console.log('\n[4b] 今日の分と累計');
   };
   const { w, errors } = boot({ mqgo_v1: JSON.stringify(st) });
   const total = w.document.getElementById('total-money').innerText;
-  const rank  = w.document.getElementById('rank').innerText;
+  const rank  = w.document.getElementById('rank').textContent;
 
   ok(total.includes('今日:5こ'), `今日は同じモードの今日の記録だけ (${total})`);
   ok(!total.includes('305'), 'モードの違う記録(円)を足し込まない');
-  ok(total.includes('ぜんぶ:40こ'), '累計は保持される');
-  ok(rank.includes('たっせい4回'), `累計回数は全件 (${rank})`);
-  ok(rank.includes('2日'), `冒険日数が出る (${rank})`);
+  ok(total.includes('累計:40こ'), '累計は保持される');
+  ok(rank.includes('クリア4回'), `累計回数は全件 (${rank})`);
+  ok(rank.includes('ぼうけん2日'), `冒険日数が出る (${rank})`);
   eq(w.eval('history.length'), 4, '古い記録が自動で消えない');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
@@ -250,7 +250,7 @@ console.log('\n[4d] 音と入力欄');
   w.close();
   ok(/autocomplete="off"/.test(html.match(/<input[^>]*id="pre-exclude-input"[^>]*>/s)[0]),
      '駅名入力に autocomplete="off" がある(自動入力バー抑止)');
-  ok(/autocomplete="off"/.test(html.match(/<input[^>]*id="new-pin"[^>]*>/s)[0]),
+  ok(/autocomplete="off"/.test(html.match(/<input[^>]*id="parent-code"[^>]*>/s)[0]),
      'PIN入力に autocomplete="off" がある');
 }
 
@@ -356,6 +356,149 @@ console.log('\n[8] バージョンとキャッシュキー');
 
   const { w } = boot();
   eq(w.document.getElementById('app-ver').textContent, '地下鉄クエスト v' + vApp, '画面にバージョンが表示される');
+  w.close();
+}
+
+
+/* ---------- 10. 称号 ---------- */
+console.log('\n[10] 称号');
+{
+  const { w, errors } = boot();
+  const R = w.eval('RANKS');
+  eq(R.length, 5, '称号は5段階');
+  eq(w.eval('getRank(0)'),   R[0].label, 'クリア0回はスタートの称号');
+  eq(w.eval('getRank(4)'),   R[1].label, 'クリア4回は2番目');
+  eq(w.eval('getRank(5)'),   R[2].label, 'クリア5回で3番目に上がる');
+  eq(w.eval('getRank(999)'), R[4].label, 'しきい値を大きく超えても最高位');
+  eq(w.eval('nextRank(4).n'), 5, '次の称号のしきい値がわかる');
+  eq(w.eval('nextRank(15)'), null, '最高位なら次はない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* クリア6回 = 3番目の称号が現在地 */
+  const st = { settings:null, spinsLeft:null, excluded:[], pin:null, totalMoney:0, noticeSeen:true,
+    history: Array.from({ length: 6 }, () => ({ station:'x', money:'1', date:'2020-01-01' })) };
+  const { w, errors } = boot({ mqgo_v1: JSON.stringify(st) });
+  w.eval('openRanks()');
+  eq(w.document.getElementById('ranks').style.display, 'block', '称号一覧が開く');
+  eq(w.document.querySelectorAll('#ranks-list .rank-row').length, 5, '全5段階が並ぶ');
+  eq(w.document.querySelectorAll('#ranks-list .rank-row.now').length, 1, '現在地が1つだけ強調される');
+  ok(w.document.querySelector('#ranks-list .rank-row.now').textContent.includes('いっちょまえ'),
+     'クリア6回なら3番目が現在地');
+  ok(w.document.getElementById('ranks-next').innerText.includes('あと 4回'),
+     `次の称号まであと何回か出る (${w.document.getElementById('ranks-next').innerText})`);
+  w.eval('closeRanks()');
+  eq(w.document.getElementById('ranks').style.display, 'none', 'とじられる');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  const { w } = boot();
+  const rank = w.document.getElementById('rank');
+  ok(rank.innerHTML.includes('openRanks'), 'ヘッダーから称号一覧を開ける');
+  ok(rank.textContent.trim().startsWith('🥚'), `称号が先頭に来る (${rank.textContent})`);
+  ok(rank.textContent.includes('クリア0回'), 'クリア回数が併記される');
+  w.close();
+}
+
+/* ---------- 11. 重みと実際の割合 ---------- */
+console.log('\n[11] 重みの割合表示');
+{
+  const { w, errors } = boot();
+  w.eval('settings.targets = [{label:"A",w:40},{label:"B",w:40},{label:"C",w:20}]');
+  w.eval('renderWeightEditor("target-editor", settings.targets)');
+  eq(w.document.getElementById('target-editor-pct-0').textContent, '40%', '合計100なら 40 は 40%');
+
+  /* 「合計が100を超えると効かない」という誤解の再発防止。
+     実際は合計に対する割合として正しく効く */
+  w.eval('editItem("target-editor",0,"w",80)');
+  eq(w.document.getElementById('target-editor-pct-0').textContent, '57.1%', '80/140 → 57.1%(頭打ちにならない)');
+  eq(w.document.getElementById('target-editor-pct-1').textContent, '28.6%', '他の項目の割合は下がる');
+  ok(w.document.getElementById('target-editor-total').textContent.includes('140'), '重みの合計が表示される');
+
+  /* 抽選そのものも合計に追従しているか(100超で偏ること) */
+  w.eval('settings.targets = [{label:"A",w:1000},{label:"B",w:1}]');
+  let a = 0;
+  for (let i = 0; i < 200; i++) if (w.eval('weightedPick(settings.targets)') === 'A') a++;
+  ok(a > 180, `重み1000対1なら大きく偏る (Aが200回中${a}回)`);
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  const { w, errors } = boot();
+  w.eval('settings.targets = [{label:"A",w:0},{label:"B",w:0}]');
+  w.eval('renderWeightEditor("target-editor", settings.targets)');
+  eq(w.document.getElementById('target-editor-pct-0').textContent, '—', '重みが全部0なら % を出さない');
+  ok(w.document.getElementById('target-editor-total').textContent.includes('0です'), '全部0のときは注意を出す');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* ラベルに引用符やタグが入っても編集欄が壊れない */
+  const { w, errors } = boot();
+  const weird = 'あ"い<b>&';
+  w.eval('settings.targets = [{label:' + JSON.stringify(weird) + ',w:10}]');
+  w.eval('renderWeightEditor("target-editor", settings.targets)');
+  const inp = w.document.querySelector('#target-editor input[type=text]');
+  eq(inp.value, weird, 'ラベルの引用符・タグでエディタが壊れない(esc)');
+  eq(w.document.querySelectorAll('#target-editor .edit-row').length, 1, '余計な要素が生えない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 12. 表示文言とタイトル ---------- */
+console.log('\n[12] 文言とタイトル');
+{
+  ok(!/ぜんぶ:/.test(html), '「ぜんぶ」表記が残っていない');
+  const { w } = boot();
+  const total = w.document.getElementById('total-money').innerText;
+  ok(total.includes('累計:'), `「累計」表記になっている (${total})`);
+  ok(total.includes('今日:'), '「今日」も併記される');
+  w.close();
+
+  const h1css = html.match(/h1 \{[^}]*\}/s)[0];
+  ok(/white-space:nowrap/.test(h1css), 'タイトルが折り返さない');
+  ok(/clamp\(/.test(h1css), '狭い画面でタイトルが縮む');
+  const title = html.match(/<h1[^>]*>([^<]*)<\/h1>/)[1];
+  ok([...title].length <= 14, `タイトルが十分短い (${title} = ${[...title].length}文字)`);
+}
+
+/* ---------- 13. 自動入力バーの抑止(第1段階) ---------- */
+console.log('\n[13] 自動入力バーの抑止');
+{
+  ok(!/id="new-pin"/.test(html), 'idから "pin" を外した(パスワードマネージャ対策)');
+  const forms = html.match(/<form[^>]*>/g) || [];
+  ok(forms.length >= 2, '入力欄が form で包まれている');
+  ok(forms.every(f => /autocomplete="off"/.test(f)), 'form に autocomplete="off" がある');
+  const sta = html.match(/<input[^>]*id="pre-exclude-input"[^>]*>/s)[0];
+  ok(/data-lpignore/.test(sta), '駅名入力に data-lpignore がある');
+  ok(/name="mq-/.test(sta), '駅名入力の name が自動入力を誘発しない名前になっている');
+  const pc = html.match(/<input[^>]*id="parent-code"[^>]*>/s)[0];
+  ok(/name="mq-/.test(pc), 'あいことば入力の name も同様');
+
+  /* 参照の付け替え漏れがないこと */
+  const { w, errors } = boot();
+  w.document.getElementById('parent-code').value = '7777';
+  w.eval('changePin()');
+  eq(w.eval('getPin()'), '7777', 'あいことばの変更が動く(id変更の追従漏れなし)');
+  eq(w.document.getElementById('parent-code').value, '', '入力欄がクリアされる');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 14. GO: ⭐表記 ---------- */
+console.log('\n[14] ⭐表記');
+{
+  const { w, errors } = boot();
+  const tbl = w.eval('settings.stamps');
+  eq(tbl.length, 5, 'スタンプは5段階');
+  ok(tbl.every(r => /^⭐+$/.test(r.label)), '全部⭐の並びになっている');
+  eq(tbl[4].label, '⭐⭐⭐⭐⭐', '最大は⭐5つ');
+  eq(w.eval('rewardValue("⭐⭐⭐")'), 3, '⭐の数を値として数える');
+  eq(w.eval('rewardValue("★★")'), 2, '★(記号)でも数えられる(後方互換)');
+  ok(!/★/.test(html.match(/stamps: \[[^\]]*\]/s)[0]), '抽選表に★(記号)が残っていない');
+  eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }
 
