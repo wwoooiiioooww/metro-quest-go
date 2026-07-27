@@ -1,5 +1,5 @@
 {
-  "name": "地下鉄クエスト・ルーレット",
+  "name": "地下鉄クエストGO",
   "short_name": "地下鉄クエストGO",
   "description": "ルーレットで行き先とミッションが決まる、親子の路線探検アプリ",
   "start_url": "./index.html",

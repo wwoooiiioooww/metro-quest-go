@@ -95,10 +95,24 @@
 
   /* ---- 設定パネル ---- */
   #settings { display:none; }
-  #notice { display:none; text-align:left; }
-  #notice h3 { color:var(--orange); font-size:1.05em; margin:0 0 8px; text-align:center; }
-  #notice p { font-size:0.8em; line-height:1.7; margin:6px 0; }
-  #notice .lead { color:var(--cyan); font-weight:bold; }
+  /* 初回に必ず読ませる画面なので、パネルではなく全画面オーバーレイにする */
+  #notice {
+    display:none; position:fixed; inset:0; z-index:300; background:var(--bg);
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
+    margin:0; max-width:none; border:none; border-radius:0; padding:26px 16px 48px;
+  }
+  .notice-inner { max-width:440px; margin:0 auto; text-align:left; }
+  #notice h3 { color:var(--orange); font-size:1.35em; margin:0 0 20px; text-align:center; }
+  #notice .big { font-size:1.02em; line-height:1.85; margin:15px 0; }
+  #notice .big b { color:var(--cyan); }
+  #notice details { margin:20px 0 4px; border-top:1px dashed var(--line); padding-top:12px; }
+  #notice summary { color:var(--cyan); font-size:0.95em; cursor:pointer; padding:8px 0; }
+  #notice details p { font-size:0.85em; line-height:1.75; color:#cfd8e3; margin:6px 0; }
+  #notice details .lead { color:var(--orange); font-weight:bold; margin-top:14px; }
+  #notice-ok {
+    background:var(--green); color:#fff; border:none; border-radius:50px; padding:14px 20px;
+    font-size:1.1em; font-weight:bold; cursor:pointer; width:100%; margin-top:24px; box-shadow:0 4px #27ae60;
+  }
   #notice-btn {
     background:none; border:1px solid var(--line); color:var(--grey);
     border-radius:8px; padding:3px 10px; font-size:0.7em; cursor:pointer; margin-bottom:8px;
@@ -191,28 +205,44 @@
   </div>
 
   <!-- ============ 保護者設定 ============ -->
-  <div class="panel" id="notice">
-    <h3>📖 はじめる前に(保護者の方へ)</h3>
+  <div id="notice">
+   <div class="notice-inner">
+    <h3>📖 はじめる前に</h3>
 
-    <p class="lead">■ このアプリについて</p>
-    <p>個人が趣味で制作した<b>非公式のアプリ</b>です。鉄道事業者をはじめ、いかなる企業・団体とも関係ありません。路線名・駅名は、行き先を示すために事実として表示しているものです。</p>
+    <p class="big">このアプリは、<b>個人が趣味で作った非公式のアプリ</b>です。鉄道会社をはじめ、どの企業・団体とも関係ありません。</p>
 
-    <p class="lead">■ 安全について</p>
-    <p>・お子さまだけで遊ばせず、<b>必ず保護者の方がご同伴ください</b>。<br>
-    ・指令(ミッション)は「その場所に行けたら達成」で構いません。<b>無理をしないこと</b>を最優先にしてください。<br>
-    ・お店・民家・私有地に立ち入るときは、必ずお声がけと許可をお願いします。<br>
-    ・駅や車内では、他のお客さまや係員の方のご迷惑にならないようご配慮ください。撮影は各鉄道事業者のルールに従ってください。</p>
+    <p class="big">お子さまだけで遊ばせず、<b>かならず保護者の方がごいっしょに</b>お願いします。</p>
 
-    <p class="lead">■ きっぷ・運賃について</p>
-    <p>途中下車できるかどうかは、きっぷの種類や区間によって異なります。フリーパス等をお使いの場合は、<b>ご利用条件を必ずご確認ください</b>。運賃に関する責任は負いかねます。</p>
+    <p class="big">指令は「その場所に行けたら達成」でかまいません。<b>ぜったいに無理をしないこと</b>を最優先にしてください。</p>
 
-    <p class="lead">■ データについて</p>
-    <p>記録は<b>お使いの端末の中だけ</b>に保存されます。外部への送信・収集は一切行っていません。ブラウザのデータを消すと記録も消えます。</p>
+    <p class="big">記録は<b>この端末の中だけ</b>に保存されます。外部への送信も、情報の収集も一切ありません。</p>
 
-    <p class="lead">■ 免責</p>
-    <p>本アプリは現状のまま提供されます。ご利用にともなって生じたいかなる損害についても、制作者は責任を負いません。</p>
+    <details>
+      <summary>くわしく（安全・マナー・きっぷ・免責）</summary>
 
-    <button id="save-btn" onclick="closeNotice()">よみました</button>
+      <p class="lead">■ 安全について</p>
+      <p>・お店・民家・私有地に立ち入るときは、必ずお声がけと許可をお願いします。<br>
+      ・階段や坂をのぼる指令は、体調と天候をみて無理のない範囲で。<br>
+      ・車道に近い場所での撮影や立ち止まりは避けてください。</p>
+
+      <p class="lead">■ 駅と車内でのマナー</p>
+      <p>他のお客さまや係員の方のご迷惑にならないようご配慮ください。撮影は各鉄道事業者のルールに従ってください。</p>
+
+      <p class="lead">■ きっぷ・運賃について</p>
+      <p>途中下車できるかどうかは、きっぷの種類や区間によって異なります。フリーパス等をお使いの場合は、ご利用条件を必ずご確認ください。運賃に関する責任は負いかねます。</p>
+
+      <p class="lead">■ 路線名・駅名について</p>
+      <p>行き先を示すための事実表記として使用しています。各社のロゴ・シンボルマーク・路線図等は一切使用していません。路線の色分けは見分けるための便宜的なもので、正式な色ではありません。</p>
+
+      <p class="lead">■ 免責</p>
+      <p>本アプリは現状のまま提供されます。ご利用にともなって生じたいかなる損害についても、制作者は責任を負いません。</p>
+
+      <p class="lead">■ データについて</p>
+      <p>ブラウザのデータを消すと記録も消えます。バックアップ機能はありません。</p>
+    </details>
+
+    <button id="notice-ok" onclick="closeNotice()">よみました</button>
+   </div>
   </div>
 
   <div class="panel" id="settings">
@@ -232,7 +262,8 @@
     <div class="sec">
       <h4>🚫 事前除外(駅の検索登録)</h4>
       <div class="edit-row">
-        <input type="text" id="pre-exclude-input" list="station-datalist" placeholder="駅名を入力…">
+        <input type="text" id="pre-exclude-input" list="station-datalist" placeholder="駅名を入力…"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
         <datalist id="station-datalist"></datalist>
         <button class="small-btn" onclick="preExclude()">除外に追加</button>
       </div>
@@ -265,7 +296,7 @@
     <div class="sec">
       <h4>🎁 ごほうびの種類と出やすさ(重み)</h4>
       <div class="note">初期設定は「スタンプ」です。ご家庭でお使いの場合は「おこづかい」に変更できます。表はそれぞれ別に保存されます。</div>
-      <div style="text-align:center; margin:6px 0 10px;">
+      <div id="reward-switch" style="text-align:center; margin:6px 0 10px;">
         <button class="small-btn" id="rw-stamp" onclick="setRewardMode('stamp')">⭐ スタンプ</button>
         <button class="small-btn" id="rw-money" onclick="setRewardMode('money')">💰 おこづかい</button>
       </div>
@@ -289,9 +320,17 @@
     </div>
 
     <div class="sec">
+      <h4>📖 はじめる前に</h4>
+      <div style="text-align:center;">
+        <button class="small-btn" onclick="openNoticeFromSettings()">もう一度読む</button>
+      </div>
+    </div>
+
+    <div class="sec">
       <h4>🔑 PIN変更</h4>
       <div class="edit-row">
-        <input type="text" id="new-pin" placeholder="新しいPIN(数字4桁など)">
+        <input type="text" id="new-pin" placeholder="新しいPIN(数字4桁など)"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
         <button class="small-btn" onclick="changePin()">変更</button>
       </div>
     </div>
@@ -443,8 +482,12 @@ const DEFAULT_MISSIONS = [
    stamp: 既定。子ども向け配布物に現金が出ないようにするため。
    money: 保護者が設定でONにすると、これまで通り金額が出る。
    ※将来スタンプラリー等と連動する場合も、この表を差し替えるだけで済む。 */
+/* 先方から「現金の要素は外してほしい」と指摘が来たら、ここを false にするだけで
+   おこづかいモードは選択肢ごと消える(既定はスタンプなので表示上の影響はない) */
+const ALLOW_MONEY_MODE = true;
+
 const REWARD_MODES = {
-  stamp: { unit:"こ", icon:"⭐", reelLabel:"スタンプ", bonus:"⭐20こ" },
+  stamp: { unit:"こ", icon:"⭐", reelLabel:"スタンプ", bonus:"★★★★★" },
   money: { unit:"円", icon:"💰", reelLabel:"金額",     bonus:"200円"  }
 };
 
@@ -457,8 +500,8 @@ const DEFAULT_SETTINGS = {
     {label:"こども1", w:40},{label:"こども2", w:40},{label:"おとな1", w:8},{label:"おとな2", w:8},{label:"みんな", w:4}
   ],
   stamps: [
-    {label:"⭐1こ", w:26},{label:"⭐2こ", w:25},{label:"⭐3こ", w:20},{label:"⭐5こ", w:13},
-    {label:"⭐8こ", w:10},{label:"⭐10こ", w:5},{label:"⭐20こ", w:1}
+    {label:"★", w:30},{label:"★★", w:26},{label:"★★★", w:22},
+    {label:"★★★★", w:14},{label:"★★★★★", w:8}
   ],
   money: [
     {label:"10円", w:26},{label:"50円", w:25},{label:"100円", w:20},{label:"200円", w:13},
@@ -468,11 +511,20 @@ const DEFAULT_SETTINGS = {
 };
 
 /* 現在のごほうびモードの定義と抽選表 */
-function rewardMode() { return REWARD_MODES[settings.rewardMode] ? settings.rewardMode : "stamp"; }
+function rewardMode() {
+  if (!ALLOW_MONEY_MODE) return "stamp";
+  return REWARD_MODES[settings.rewardMode] ? settings.rewardMode : "stamp";
+}
 function rewardDef()  { return REWARD_MODES[rewardMode()]; }
 function rewardTable(){ return rewardMode() === "money" ? settings.money : settings.stamps; }
-/* ラベルから数値を取り出す("⭐10こ"→10 / "500円"→500)。自由入力にも耐える */
-function rewardValue(label) { const m = String(label).match(/\d+/); return m ? parseInt(m[0]) : 0; }
+/* ラベルから数値を取り出す。数字があればそれを("500円"→500)、
+   無ければ★の数を数える("★★★"→3)。保護者の自由入力にも耐える */
+function rewardValue(label) {
+  const s = String(label);
+  const m = s.match(/\d+/);
+  if (m) return parseInt(m[0]);
+  return (s.match(/★/g) || []).length;
+}
 
 /* =========================================================
    3. 状態管理
@@ -484,7 +536,7 @@ function rewardValue(label) { const m = String(label).match(/\d+/); return m ? p
      同一オリジンに家族版の旧キーが残っている可能性があり、
      拾うと他アプリのデータを取り込んでしまうため。
    ========================================================= */
-const APP_VER = 'v1';
+const APP_VER = 'v2';
 const APP_KEY = 'mqgo_v1';
 
 /* totalMoney: ごほうびの累計。stampモードでは「こ」、moneyモードでは「円」。
@@ -548,9 +600,22 @@ function getCandidates(ignoreExclude=false) {
    5. 効果音・演出
    ========================================================= */
 let audioCtx = null;
-function beep(freq, duration, type='sine') {
+/* モバイルでは、ユーザー操作の中で AudioContext を作って resume() しないと
+   suspended のままになり、setTimeout経由で鳴らす音がすべて無音になる。
+   画面のどこかを触るたびに解除を試みる(バックグラウンド復帰後も再中断するため) */
+function unlockAudio() {
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch(e){}
+}
+document.addEventListener('pointerdown', unlockAudio, { passive:true });
+document.addEventListener('touchstart', unlockAudio, { passive:true });
+
+function beep(freq, duration, type='sine') {
+  try {
+    unlockAudio();
+    if (!audioCtx) return;
     const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
     osc.connect(gain); gain.connect(audioCtx.destination);
     osc.type = type; osc.frequency.value = freq;
@@ -670,6 +735,7 @@ function clearMission() {
   history.unshift({
     station: currentResult.station, mission: currentResult.mission,
     money: currentResult.money, target: currentResult.target,
+    date: todayKey(), mode: rewardMode(),
     time: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})
   });
   store.history = history; saveStore();
@@ -688,11 +754,29 @@ function getRank(n) {
   if (n >= 1)  return "🌱 見習いたんけん隊";
   return "🥚 これから冒険!";
 }
+/* 端末のローカル日付を YYYY-MM-DD で返す(Dateのlocale差を避けて自前で組む) */
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+/* 「今日の分」は履歴から集計する。自動リセットは一切しない(記録は消さない)。
+   ごほうびモードが違う記録は合計に混ぜない(★と円が足し合わされないように) */
+function todayStats() {
+  const t = todayKey(), m = rewardMode();
+  const mine = history.filter(h => h.date === t && (h.mode || 'money') === m);
+  return {
+    count : mine.length,
+    reward: mine.reduce((s,h) => s + rewardValue(h.money), 0),
+    days  : new Set(history.filter(h => h.date).map(h => h.date)).size
+  };
+}
 function updateHeader() {
-  const rw = rewardDef();
+  const rw = rewardDef(), st = todayStats();
   document.getElementById('spins-left').innerText = `残り回数:${spinsLeft}回`;
-  document.getElementById('total-money').innerText = `今日の合計:${totalMoney}${rw.unit} ${rw.icon}`;
-  document.getElementById('rank').innerText = `たっせい${history.length}回 ${getRank(history.length)}`;
+  document.getElementById('total-money').innerText =
+    `今日:${st.reward}${rw.unit} ${rw.icon}　ぜんぶ:${totalMoney}${rw.unit}`;
+  const days = st.days > 0 ? `・${st.days}日` : '';
+  document.getElementById('rank').innerText = `たっせい${history.length}回${days} ${getRank(history.length)}`;
   document.getElementById('reel-label-2').innerText = rw.reelLabel;
   updateSummary();
 }
@@ -825,6 +909,8 @@ function renderSettings() {
   const on = rewardMode();
   document.getElementById('rw-stamp').style.opacity = on === 'stamp' ? '1' : '0.4';
   document.getElementById('rw-money').style.opacity = on === 'money' ? '1' : '0.4';
+  /* ALLOW_MONEY_MODE=false のときは切替そのものを見せない */
+  document.getElementById('reward-switch').style.display = ALLOW_MONEY_MODE ? 'block' : 'none';
   // ミッション
   document.getElementById('mission-editor').value = settings.missions.join("\n");
 }
@@ -865,6 +951,7 @@ function addMoneyRow(){ const a=rewardTable(); a.push({label: rewardMode()==='mo
 /* ごほうびモードの切替。表そのものはモードごとに別々に保持されるので、
    切り替えても相手側の設定は失われない */
 function setRewardMode(m){
+  if (m === 'money' && !ALLOW_MONEY_MODE) return;
   settings.rewardMode = (m === 'money') ? 'money' : 'stamp';
   renderSettings(); updateHeader();
 }
@@ -914,6 +1001,10 @@ function openNotice(){
   document.getElementById('notice').style.display = 'block';
   window.scrollTo({top:0, behavior:'smooth'});
 }
+function openNoticeFromSettings(){
+  document.getElementById('settings').style.display = 'none';
+  openNotice();
+}
 function closeNotice(){
   document.getElementById('notice').style.display = 'none';
   store.noticeSeen = true; saveStore();
@@ -921,6 +1012,9 @@ function closeNotice(){
 
 /* --- 初期化 --- */
 document.getElementById('app-ver').textContent = '地下鉄クエスト ' + APP_VER;
+/* 切替の表示可否は renderSettings() でも設定するが、設定画面を一度も
+   開かない場合に未設定のままになるため、起動時にも必ず反映しておく */
+document.getElementById('reward-switch').style.display = ALLOW_MONEY_MODE ? 'block' : 'none';
 renderExcluded(); renderHistory(); updateHeader();
 /* 初回起動時は注意事項を必ず一度出す(配布版のため) */
 if (!store.noticeSeen) openNotice();

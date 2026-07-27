@@ -180,6 +180,80 @@ console.log('\n[4] ごほうび(スタンプ / おこづかい)');
   w.close();
 }
 
+/* ---------- 4b. 今日 / 累計 / 冒険日数 ---------- */
+console.log('\n[4b] 今日の分と累計');
+{
+  const d = new Date();
+  const T = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const st = {
+    settings:null, spinsLeft:null, excluded:[], pin:null, noticeSeen:true, totalMoney: 40,
+    history: [
+      { station:'上野', money:'★★★',  date:T,            mode:'stamp' },
+      { station:'銀座', money:'★★',    date:T,            mode:'stamp' },
+      { station:'浅草', money:'★★★★', date:'2020-01-01', mode:'stamp' },
+      { station:'新橋', money:'300円',  date:T,            mode:'money' }, // 別モードの記録
+    ],
+  };
+  const { w, errors } = boot({ mqgo_v1: JSON.stringify(st) });
+  const total = w.document.getElementById('total-money').innerText;
+  const rank  = w.document.getElementById('rank').innerText;
+
+  ok(total.includes('今日:5こ'), `今日は同じモードの今日の記録だけ (${total})`);
+  ok(!total.includes('305'), 'モードの違う記録(円)を足し込まない');
+  ok(total.includes('ぜんぶ:40こ'), '累計は保持される');
+  ok(rank.includes('たっせい4回'), `累計回数は全件 (${rank})`);
+  ok(rank.includes('2日'), `冒険日数が出る (${rank})`);
+  eq(w.eval('history.length'), 4, '古い記録が自動で消えない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  const { w } = boot();
+  w.eval('currentResult = {station:"上野", mission:"テスト", money:"★★★", target:"みんな"}');
+  w.eval('clearMission()');
+  const h = JSON.parse(w.localStorage.getItem('mqgo_v1')).history[0];
+  ok(/^\d{4}-\d{2}-\d{2}$/.test(h.date), `新しい記録に日付が入る (${h.date})`);
+  eq(h.mode, 'stamp', '新しい記録にモードが入る');
+  ok(w.document.getElementById('total-money').innerText.includes('今日:3こ'), '今日の合計に即反映');
+  w.close();
+}
+
+/* ---------- 4c. おこづかいモードのフラグ ---------- */
+console.log('\n[4c] ALLOW_MONEY_MODE');
+{
+  const { w } = boot();
+  eq(w.eval('ALLOW_MONEY_MODE'), true, '既定では有効');
+  eq(w.document.getElementById('reward-switch').style.display, 'block', '切替ボタンが見えている');
+  w.close();
+}
+{
+  /* 1行 false にするだけで、切替がUIごと消えること */
+  const off = html.replace('const ALLOW_MONEY_MODE = true;', 'const ALLOW_MONEY_MODE = false;');
+  ok(off !== html, 'ALLOW_MONEY_MODE行を置換できる');
+  const { w, errors } = boot(null, off);
+  eq(w.document.getElementById('reward-switch').style.display, 'none', 'false で切替ボタンが消える');
+  w.eval('setRewardMode("money")');
+  eq(w.eval('rewardMode()'), 'stamp', 'false ならおこづかいに切り替わらない');
+  ok(!w.document.getElementById('total-money').innerText.includes('円'), 'false なら円が一切出ない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 4d. 音と入力欄 ---------- */
+console.log('\n[4d] 音と入力欄');
+{
+  const { w, errors } = boot();
+  eq(w.eval('typeof unlockAudio'), 'function', 'unlockAudio がある');
+  eq(w.eval('(function(){try{beep(440,0.1);return "ok"}catch(e){return e.message}})()'), 'ok',
+     'AudioContext非対応環境でも beep が例外を投げない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+  ok(/autocomplete="off"/.test(html.match(/<input[^>]*id="pre-exclude-input"[^>]*>/s)[0]),
+     '駅名入力に autocomplete="off" がある(自動入力バー抑止)');
+  ok(/autocomplete="off"/.test(html.match(/<input[^>]*id="new-pin"[^>]*>/s)[0]),
+     'PIN入力に autocomplete="off" がある');
+}
+
 /* ---------- 5. 「はじめる前に」パネル ---------- */
 console.log('\n[5] 注意事項パネル');
 {
@@ -189,10 +263,29 @@ console.log('\n[5] 注意事項パネル');
   ok(t.includes('非公式'), '非公式である旨が書かれている');
   ok(t.includes('保護者'), '保護者同伴の注意が書かれている');
   ok(t.includes('免責'), '免責が書かれている');
+
+  /* スクロールしないと見えない問題の再発防止: 全画面オーバーレイであること */
+  const css = html.match(/#notice \{[^}]*\}/s)[0];
+  ok(/position:fixed/.test(css), '#notice が position:fixed(全画面オーバーレイ)');
+  ok(/inset:0/.test(css), '#notice が画面全体を覆う');
+  ok(/z-index:\s*(\d{3,})/.test(css), '#notice が最前面に出る');
+  ok(w.document.querySelector('#notice details'), '「くわしく」が折りたたみになっている');
+  ok(w.document.querySelector('#notice .big'), '要点が大きい文字で書かれている');
+
   w.eval('closeNotice()');
   eq(w.document.getElementById('notice').style.display, 'none', '「よみました」で閉じる');
   eq(JSON.parse(w.localStorage.getItem('mqgo_v1')).noticeSeen, true, '既読が保存される');
   eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 設定からいつでも読み返せる */
+  const seen = { settings:null, spinsLeft:null, excluded:[], history:[], totalMoney:0, pin:null, noticeSeen:true };
+  const { w } = boot({ mqgo_v1: JSON.stringify(seen) });
+  eq(w.eval('typeof openNoticeFromSettings'), 'function', '設定から開く関数がある');
+  w.eval('openNoticeFromSettings()');
+  eq(w.document.getElementById('notice').style.display, 'block', '設定から読み返せる');
+  eq(w.document.getElementById('settings').style.display, 'none', 'そのとき設定は閉じる');
   w.close();
 }
 {
