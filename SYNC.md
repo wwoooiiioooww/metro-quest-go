@@ -19,8 +19,8 @@
 | # | 箇所 | 家族版 `metro-quest` | 配布版 `metro-quest-go` | 理由 |
 |---|---|---|---|---|
 | 1 | `APP_KEY` | `'mq_v1'` | `'mqgo_v1'` | GitHub Pagesでは両者が**同一オリジン**。キーが同じだとデータを共有してしまう |
-| 2 | `CACHE_NAME` (sw.js) | `'metro-quest-v9'` | `'metro-quest-go-v5'` | 同上。Cache Storageもオリジン単位 |
-| 3 | `APP_VER` | `'v9'` | `'v5'` | 別アプリとして採番。`CACHE_NAME` と必ず揃える |
+| 2 | `CACHE_NAME` (sw.js) | `'metro-quest-v10'` | `'metro-quest-go-v6'` | 同上。Cache Storageもオリジン単位 |
+| 3 | `APP_VER` | `'v10'` | `'v6'` | 別アプリとして採番。`CACHE_NAME` と必ず揃える |
 | 4 | `migrateLegacy()` | **あり** | **なし（意図的）** | 配布版が旧キー（`questHistory` 等）を拾うと、**家族版のデータを取り込んでしまう** |
 | 5 | `LEGACY_KEYS` | あり | なし | 同上 |
 | 6 | `TARGET` | なし | `{ companies:['metro'], strict:false }` | 配布先ごとの初期路線の切り替え |
@@ -53,12 +53,19 @@
 | 33 | 画面下タブのアイコン | 🎰 あそぶ | 🚇 あそぶ | 遊技の記号を使わない |
 | 34 | `legacyStampsV2()` / `isUnedited()` | なし | あり | 未編集の★表を⭐へ差し替えるため |
 | 35 | `openNoticeFromSettings()` | なし | あり | 「はじめる前に」を設定から読み返すため |
+| 36 | **あそぶタブの意匠** | リール＋STOPボタン | **運転台**（前面展望・速度計・LED方向幕・ブレーキレバー） | バッチ3b。GOで試してから家族版への移植を判断する |
+| 37 | `setCab()` / `setCabSpeed()` / `cabState` | なし | あり | 36の状態機械（stopped/accel/cruise/braking/arriving） |
+| 38 | `settings.motion` と `motionOn()` / `applyMotionPref()` | なし | あり | 演出OFF。`prefers-reduced-motion` にも追従 |
+| 39 | 起動演出 `#splash` / `hideSplash()` | なし | あり | 1.2秒。演出OFFなら出さない |
+| 40 | 運転台の音 | なし | 走行音・発車ベル・ブレーキ・到着 | 36に対応。走行音は oscillator を1本保持 |
+| 41 | 注意書きの表示タイミング | — | **起動演出のあと** | 39に対応 |
 
 ### 共通化された箇所（両方に同じものが入っている）
 
 以下は**同じ実装**なので、片方を直したらもう片方にもそのまま反映してください。
 
 - `unlockAudio()` … モバイルで音が鳴らない問題の対策
+- `beep()` の音量 0.35（小さくて聞こえないとの報告への対応。両方に適用済み）
 - 入力欄の `autocomplete="off"` … Androidの自動入力バー抑止
 - `todayKey()` / 記録の `date` フィールド … 「今日の分」の集計
 - 冒険日数の表示ロジック

@@ -21,6 +21,7 @@ function ok(cond, name) {
   if (cond) { passed++; console.log('  ✓ ' + name); }
   else { failed++; fails.push(name); console.log('  ✗ ' + name); }
 }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 function eq(a, b, name) {
   const same = Object.is(a, b);
   ok(same, name + (same ? '' : ` (got ${JSON.stringify(a)}, want ${JSON.stringify(b)})`));
@@ -256,7 +257,9 @@ console.log('\n[4d] 音と入力欄');
 console.log('\n[5] 注意事項パネル');
 {
   const { w, errors } = boot();
-  eq(w.document.getElementById('notice').style.display, 'block', '初回起動で自動表示される');
+  ok(w.document.getElementById('notice').style.display !== 'block', '起動演出の最中は注意書きを出さない');
+  w.eval('hideSplash()');
+  eq(w.document.getElementById('notice').style.display, 'block', '起動演出のあとに自動表示される');
   const t = w.document.getElementById('notice').textContent;
   ok(t.includes('非公式'), '非公式である旨が書かれている');
   ok(t.includes('保護者'), '保護者同伴の注意が書かれている');
@@ -669,6 +672,150 @@ console.log('\n[18] 保護者モードのロック');
 {
   ok(/id="lock-btn"/.test(html), 'ロックボタンが設置されている');
   ok(/lockParent\(\)/.test(html), 'ロックボタンから lockParent が呼ばれる');
+}
+
+
+/* ---------- 19. 運転台の状態機械 ---------- */
+console.log('\n[19] 運転台');
+{
+  const { w, errors } = boot();
+  const root = () => w.document.documentElement.style;
+  eq(w.eval('cabState'), 'stopped', '起動時は停車');
+  eq(root().getPropertyValue('--spd'), '0s', '停車中は車窓が止まっている');
+  eq(root().getPropertyValue('--kmh'), '0', '速度計は0');
+  eq(w.document.getElementById('speedo-num').textContent, '0', '速度計の数字も0');
+
+  w.eval('setCab("cruise")');
+  eq(w.eval('cabState'), 'cruise', '巡航に移れる');
+  ok(root().getPropertyValue('--spd') !== '0s', '巡航中は車窓が流れる');
+  eq(root().getPropertyValue('--kmh'), '78', '巡航の速度計');
+  eq(w.document.getElementById('cab-view').className, 'cruise', '車窓に状態クラスが付く');
+
+  w.eval('setCab("arriving")');
+  eq(root().getPropertyValue('--kmh'), '12', '到着時は減速している');
+  w.eval('setCab("stopped")');
+  eq(root().getPropertyValue('--spd'), '0s', '停車で車窓が止まる');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 発車 → ブレーキ4回 → 停車。状態遷移が閉じていること */
+  const { w, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.eval('startAll()');
+  ok(['accel','cruise'].includes(w.eval('cabState')), `発車で加速する (${w.eval('cabState')})`);
+  eq(w.eval('runningCount()'), 4, '4つとも回っている');
+
+  w.eval('stopReel(0)');
+  eq(w.eval('cabState'), 'braking', '1本目のブレーキで減速に入る');
+  eq(w.eval('runningCount()'), 3, '残り3つ');
+  const k3 = +w.document.documentElement.style.getPropertyValue('--kmh');
+  w.eval('stopReel(1)');
+  const k2 = +w.document.documentElement.style.getPropertyValue('--kmh');
+  ok(k2 < k3, `ブレーキごとに速度が落ちる (${k3} → ${k2})`);
+
+  w.eval('stopReel(2)');
+  w.eval('stopReel(3)');
+  eq(w.eval('runningCount()'), 0, '全部止まった');
+  eq(w.eval('cabState'), 'arriving', '全部止まると到着状態');
+  ok(w.document.getElementById('station-sign').classList.contains('on'), '駅名標がせり上がる');
+  ok(w.document.getElementById('station-sign').textContent.length > 0, '駅名標に駅名が入る');
+  ok(w.document.getElementById('dest-text').textContent.length > 0, '方向幕に行き先が出る');
+
+  await sleep(900);
+  eq(w.eval('cabState'), 'stopped', '0.8秒後に停車へ戻る(遷移が閉じている)');
+  eq(w.document.documentElement.style.getPropertyValue('--spd'), '0s', '停車で車窓が止まる');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 20. 演出OFF ---------- */
+console.log('\n[20] 演出OFF');
+{
+  const { w, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.eval('setMotion(false)');
+  eq(w.eval('motionOn()'), false, '設定でOFFにできる');
+  ok(w.document.body.classList.contains('no-motion'), 'body に no-motion が付く');
+
+  /* OFFでも全機能が使えること */
+  w.eval('startAll()');
+  eq(w.document.documentElement.style.getPropertyValue('--spd'), '0s', 'OFFなら車窓は動かない');
+  eq(w.eval('runningCount()'), 4, 'OFFでも発車できる');
+  for (let i = 0; i < 4; i++) w.eval('stopReel(' + i + ')');
+  eq(w.eval('runningCount()'), 0, 'OFFでも止められる');
+  ok(w.eval('currentResult.station').length > 0, 'OFFでも行き先が決まる');
+  eq(w.document.documentElement.style.getPropertyValue('--spd'), '0s', 'OFFなら到着時も動かない');
+
+  w.eval('clearMission()');
+  eq(w.eval('history.length'), 1, 'OFFでも記録できる');
+  eq(JSON.parse(w.localStorage.getItem('mqgo_v1')).history.length, 1, 'OFFでも保存できる');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* OSの「視差効果を減らす」は設定より優先される */
+  const { w, errors } = boot();
+  w.matchMedia = () => ({ matches: true, media: '', addListener(){}, removeListener(){} });
+  w.eval('settings.motion = true');
+  eq(w.eval('motionOn()'), false, 'prefers-reduced-motion なら設定に関係なくOFF');
+  w.eval('setCab("cruise")');
+  eq(w.document.documentElement.style.getPropertyValue('--spd'), '0s', 'その場合は車窓も動かない');
+  eq(w.document.documentElement.style.getPropertyValue('--kmh'), '78', '速度計の数値は情報なので出す');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 設定に無い古い保存でも既定ON */
+  const st = { settings:{ lines:['G'], areas:['tokyo23'], spinsPerDay:20,
+                          targets:[{label:'A',w:1}], missions:['m'] },
+               spinsLeft:null, excluded:[], history:[], totalMoney:0, pin:null, noticeSeen:true };
+  const { w } = boot({ mqgo_v1: JSON.stringify(st) });
+  eq(w.eval('settings.motion'), true, '古い保存には motion がデフォルトで補われる');
+  w.close();
+}
+
+/* ---------- 21. 起動演出 ---------- */
+console.log('\n[21] 起動演出');
+{
+  const { w, errors } = boot();
+  ok(w.document.getElementById('splash'), 'スプラッシュがある');
+  ok(!w.document.getElementById('splash').classList.contains('off'), '起動直後は表示されている');
+  await sleep(1500);
+  ok(w.document.getElementById('splash').classList.contains('off'), '1.2秒で消える');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  const { w } = boot();
+  w.eval('hideSplash()');
+  ok(w.document.getElementById('splash').classList.contains('off'), 'タップで即スキップできる');
+  w.close();
+}
+{
+  /* 演出OFFのときはスプラッシュを待たない */
+  const off = { settings:{ lines:['G'], areas:['tokyo23'], spinsPerDay:20,
+                           targets:[{label:'A',w:1}], missions:['m'], motion:false },
+                spinsLeft:null, excluded:[], history:[], totalMoney:0, pin:null, noticeSeen:false };
+  const { w } = boot({ mqgo_v1: JSON.stringify(off) });
+  ok(w.document.getElementById('splash').classList.contains('off'), '演出OFFなら起動演出を出さない');
+  eq(w.document.getElementById('notice').style.display, 'block', 'その場合も注意書きは出る');
+  w.close();
+}
+
+/* ---------- 22. 意匠を変えてもidが変わっていないこと ---------- */
+console.log('\n[22] idの回帰防止');
+{
+  const { w } = boot();
+  for (let i = 0; i < 4; i++) {
+    ok(w.document.getElementById('reel-' + i), '表示器 reel-' + i + ' が残っている');
+    ok(w.document.getElementById('stop-' + i), 'ブレーキ stop-' + i + ' が残っている');
+  }
+  ok(w.document.getElementById('start-btn'), '発車ボタンのidが変わっていない');
+  ok(w.document.getElementById('clear-btn'), '達成ボタンのidが変わっていない');
+  ok(w.document.getElementById('reel-label-2'), 'ごほうびのラベルidが変わっていない');
+  ok(w.document.getElementById('bonus-msg'), 'ボーナス表示のidが変わっていない');
+  w.close();
 }
 
 /* ---------- 結果 ---------- */

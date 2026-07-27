@@ -306,12 +306,44 @@
     font-size:1.05em; font-weight:bold; cursor:pointer; width:100%; margin-top:12px; box-shadow:0 4px #27ae60;
   }
   #save-btn:active, #lock-btn:active { transform:translateY(4px); box-shadow:0 0 #27ae60; }
+  /* ---- 起動演出 ---- */
+  #splash {
+    position:fixed; inset:0; z-index:400; background:var(--bg);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+  }
+  #splash .sp-train { font-size:3.4em; animation:depart 1.2s cubic-bezier(.35,0,.4,1) forwards; }
+  #splash .sp-rail {
+    width:76%; max-width:320px; height:5px; border-radius:3px;
+    background-image:repeating-linear-gradient(to right, var(--line) 0 12px, transparent 12px 22px);
+    animation:railrun .35s linear infinite;
+  }
+  #splash .sp-title { color:var(--orange); font-size:1.1em; font-weight:bold; letter-spacing:2px; }
+  @keyframes depart {
+    0%   { transform:translateX(-58vw) scale(.85); opacity:0; }
+    35%  { opacity:1; }
+    100% { transform:translateX(6vw) scale(1); opacity:1; }
+  }
+  @keyframes railrun { to { background-position-x:-22px; } }
+  #splash.off { opacity:0; pointer-events:none; transition:opacity .35s; }
+
+  /* 演出OFF: 動きを止める。機能はすべて使えるままにする */
+  body.no-motion #speedo .needle,
+  body.no-motion #station-sign,
+  body.no-motion #cab-view::after { transition:none; }
+  body.no-motion .sp-train, body.no-motion .sp-rail { animation:none; }
+
   /* 紙吹雪 */
   .confetti { position:fixed; top:-10%; font-size:1.6em; pointer-events:none; animation:fall 2.2s linear forwards; z-index:99; }
   @keyframes fall { to { transform:translateY(115vh) rotate(540deg); opacity:0.8; } }
 </style>
 </head>
 <body>
+
+  <div id="splash" onclick="hideSplash()">
+    <div class="sp-train">🚃</div>
+    <div class="sp-rail"></div>
+    <div class="sp-title">地下鉄クエストGO</div>
+  </div>
 
   <h1 id="title">🚇 地下鉄クエストGO</h1>
   <div id="spins-left"></div>
@@ -532,6 +564,16 @@
     </div>
 
     <div class="sec">
+      <h4>🎬 えんしゅつ</h4>
+      <div class="note">車窓の動きや音を止めます。乗り物酔いしやすいお子さまや、動作が重い端末ではOFFにしてください。機能はすべてそのまま使えます。</div>
+      <div style="text-align:center; margin-top:6px;">
+        <button class="small-btn" id="motion-on"  onclick="setMotion(true)">🎬 ON</button>
+        <button class="small-btn" id="motion-off" onclick="setMotion(false)">⏸ OFF</button>
+      </div>
+      <div class="note" id="motion-note"></div>
+    </div>
+
+    <div class="sec">
       <h4>🔒 保護者モードのロック</h4>
       <div class="note">お子さまに端末をわたす前にロックしてください。次に「せってい」を開くときは、あいことばの入力が必要になります。</div>
       <button id="lock-btn" onclick="lockParent()">🔒 いますぐロックする</button>
@@ -717,6 +759,7 @@ const DEFAULT_SETTINGS = {
   lines: Object.keys(LINES).filter(l => TARGET.companies.includes(LINES[l].co)),
   spinsPerDay: 20,
   rewardMode: "stamp",
+  motion: true,
   targets: [
     {label:"こども1", w:40},{label:"こども2", w:40},{label:"おとな1", w:8},{label:"おとな2", w:8},{label:"みんな", w:4}
   ],
@@ -757,7 +800,7 @@ function rewardValue(label) {
      同一オリジンに家族版の旧キーが残っている可能性があり、
      拾うと他アプリのデータを取り込んでしまうため。
    ========================================================= */
-const APP_VER = 'v5';
+const APP_VER = 'v6';
 const APP_KEY = 'mqgo_v1';
 
 /* totalMoney: ごほうびの累計。stampモードでは「こ」、moneyモードでは「円」。
@@ -824,6 +867,60 @@ function persistSettings() { store.settings = settings; saveStore(); }
 function getPin() { return store.pin || "1234"; }
 
 /* =========================================================
+   3-b. 運転台の演出
+   --spd(車窓の周期) と --kmh(速度計) を :root に書くだけで、
+   見た目はすべてCSS側で追従する。抽選ロジックには手を入れない。
+   ========================================================= */
+let cabState = 'stopped';
+
+/* 演出を出してよいか。OSの「視差効果を減らす」設定があれば設定より優先して止める */
+function motionOn() {
+  if (settings.motion === false) return false;
+  try { return !window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+  catch(e) { return true; }
+}
+function applyMotionPref() {
+  document.body.classList.toggle('no-motion', !motionOn());
+}
+function runningCount() { return isRunning.filter(Boolean).length; }
+
+/* 速度から車窓の周期を決める。0 は「アニメーション停止」= 停車 */
+function setCabSpeed(kmh) {
+  const root = document.documentElement.style;
+  root.setProperty('--spd', (!motionOn() || kmh <= 0) ? '0s' : (18 / kmh).toFixed(2) + 's');
+  root.setProperty('--kmh', String(kmh));
+  const num = document.getElementById('speedo-num');
+  if (num) num.textContent = String(kmh);
+}
+
+/* stopped → accel → cruise → braking(×4) → arriving → stopped */
+function setCab(state) {
+  cabState = state;
+  const view = document.getElementById('cab-view');
+  if (view) view.className = state;
+  if (state === 'stopped')       { setCabSpeed(0);  stopRunSound(); }
+  else if (state === 'accel')    { setCabSpeed(45); startRunSound(); }
+  else if (state === 'cruise')   { setCabSpeed(78); startRunSound(); }
+  else if (state === 'braking')  { setCabSpeed(Math.max(16, 20 * runningCount())); startRunSound(); }
+  else if (state === 'arriving') { setCabSpeed(12); stopRunSound(); }
+}
+
+function setDest(text) {
+  const el = document.getElementById('dest-text');
+  if (el) el.textContent = text;
+}
+function showStationSign(name) {
+  const sign = document.getElementById('station-sign');
+  if (!sign) return;
+  sign.textContent = name;
+  sign.classList.add('on');
+}
+function hideStationSign() {
+  const sign = document.getElementById('station-sign');
+  if (sign) sign.classList.remove('on');
+}
+
+/* =========================================================
    4. 候補生成(フィルタ本体)
    ========================================================= */
 function getCandidates(ignoreExclude=false) {
@@ -859,12 +956,34 @@ function beep(freq, duration, type='sine') {
     const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
     osc.connect(gain); gain.connect(audioCtx.destination);
     osc.type = type; osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
     osc.start(); osc.stop(audioCtx.currentTime + duration);
   } catch(e){}
 }
 function stopSound(){ beep(600,0.12,'square'); }
+/* 運転台の音。走行音だけは鳴らしっぱなしなので oscillator を1本保持する */
+let runOsc = null;
+function startRunSound() {
+  if (!motionOn()) return;
+  try {
+    unlockAudio();
+    if (!audioCtx || runOsc) return;
+    runOsc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    runOsc.type = 'sawtooth'; runOsc.frequency.value = 55;
+    g.gain.value = 0.05;
+    runOsc.connect(g); g.connect(audioCtx.destination);
+    runOsc.start();
+  } catch(e){ runOsc = null; }
+}
+function stopRunSound() {
+  try { if (runOsc) { runOsc.stop(); runOsc.disconnect(); } } catch(e){}
+  runOsc = null;
+}
+function departSound(){ [880,1047].forEach((f,i)=>setTimeout(()=>beep(f,0.22,'triangle'),i*180)); }
+function brakeSound(){ beep(300,0.10,'square'); }
+function arriveSound(){ [784,659,523].forEach((f,i)=>setTimeout(()=>beep(f,0.18,'triangle'),i*130)); }
 function bonusSound(){ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>beep(f,0.18,'triangle'),i*120)); }
 function clearSound(){ [659,880].forEach((f,i)=>setTimeout(()=>beep(f,0.15),i*100)); }
 function brothersSound(){ [523,659,784,880,1047,1319].forEach((f,i)=>setTimeout(()=>beep(f,0.15,'triangle'),i*90)); }
@@ -912,6 +1031,13 @@ function startAll() {
   document.getElementById('clear-btn').style.display = 'none';
   document.getElementById('bonus-msg').style.display = 'none';
 
+  /* 発車 */
+  hideStationSign();
+  setDest('＿＿＿＿');
+  departSound();
+  setCab('accel');
+  setTimeout(() => { if (cabState === 'accel') setCab('cruise'); }, 600);
+
   for (let i=0;i<4;i++) {
     isRunning[i] = true;
     document.getElementById(`stop-${i}`).disabled = false;
@@ -930,14 +1056,19 @@ function stopReel(index) {
   if (!isRunning[index]) return;
   clearInterval(intervals[index]);
   isRunning[index] = false;
-  document.getElementById(`stop-${index}`).disabled = true;
-  stopSound();
+  const lever = document.getElementById(`stop-${index}`);
+  lever.disabled = true;
+  lever.classList.add('pulled');
+  setTimeout(() => lever.classList.remove('pulled'), 220);
+  brakeSound();
+  setCab(runningCount() > 0 ? 'braking' : 'arriving');
 
   const box = document.getElementById(`reel-${index}`);
   if (index === 0) {
     const avail = getCandidates();
     const st = avail[Math.floor(Math.random()*avail.length)];
     currentResult.station = st.name; lastStation = st.name;
+    setDest(st.name);
     box.innerHTML = `<div>${st.name}</div><div class="line-chips">` +
       st.lines.map(l=>`<span class="lc" style="background:${LINES[l].c}">${LINES[l].n}</span>`).join('') + `</div>`;
   }
@@ -953,6 +1084,11 @@ function stopReel(index) {
 
 function checkAllStopped() {
   if (!isRunning.includes(true)) {
+    /* 到着。0.8秒かけて停車し、駅名標がせり上がる */
+    setCab('arriving');
+    arriveSound();
+    if (currentResult.station) showStationSign(currentResult.station);
+    setTimeout(() => setCab('stopped'), 800);
     if (spinsLeft > 0) document.getElementById('start-btn').disabled = false;
     document.getElementById('clear-btn').style.display = 'inline-block';
     if (Math.random() < 0.03) {
@@ -1183,6 +1319,13 @@ function renderSettings() {
   // 対象者・ごほうび
   renderWeightEditor('target-editor', settings.targets);
   renderWeightEditor('money-editor', rewardTable());
+  /* えんしゅつの選択状態 */
+  const mo = settings.motion !== false;
+  document.getElementById('motion-on').style.opacity  = mo ? '1' : '0.4';
+  document.getElementById('motion-off').style.opacity = mo ? '0.4' : '1';
+  document.getElementById('motion-note').textContent =
+    motionOn() ? '' : '⏸ いま演出は止まっています(端末の「視差効果を減らす」設定が入っている場合も止まります)';
+
   const on = rewardMode();
   document.getElementById('rw-stamp').style.opacity = on === 'stamp' ? '1' : '0.4';
   document.getElementById('rw-money').style.opacity = on === 'money' ? '1' : '0.4';
@@ -1251,6 +1394,12 @@ function addMoneyRow(){ const a=rewardTable(); a.push({label: rewardMode()==='mo
 
 /* ごほうびモードの切替。表そのものはモードごとに別々に保持されるので、
    切り替えても相手側の設定は失われない */
+function setMotion(on) {
+  settings.motion = !!on;
+  applyMotionPref();
+  setCabSpeed(cabState === 'stopped' ? 0 : 45);
+  renderSettings();
+}
 function setRewardMode(m){
   if (m === 'money' && !ALLOW_MONEY_MODE) return;
   settings.rewardMode = (m === 'money') ? 'money' : 'stamp';
@@ -1338,7 +1487,18 @@ document.getElementById('app-ver').textContent = '地下鉄クエスト ' + APP_
 document.getElementById('reward-switch').style.display = ALLOW_MONEY_MODE ? 'block' : 'none';
 renderExcluded(); renderHistory(); updateHeader();
 /* 初回起動時は注意事項を必ず一度出す(配布版のため) */
-if (!store.noticeSeen) openNotice();
+/* 起動演出 → そのあとで注意書き。順序を守る */
+function hideSplash() {
+  const sp = document.getElementById('splash');
+  if (!sp || sp.classList.contains('off')) return;
+  sp.classList.add('off');
+  setTimeout(() => { sp.style.display = 'none'; }, 400);
+  if (!store.noticeSeen) openNotice();
+}
+applyMotionPref();
+setCab('stopped');
+if (motionOn()) setTimeout(hideSplash, 1200);
+else hideSplash();
 
 /* --- PWA: Service Worker登録 --- */
 if ('serviceWorker' in navigator) {
