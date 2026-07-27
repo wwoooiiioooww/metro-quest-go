@@ -248,8 +248,6 @@ console.log('\n[4d] 音と入力欄');
      'AudioContext非対応環境でも beep が例外を投げない');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
-  ok(/autocomplete="off"/.test(html.match(/<input[^>]*id="pre-exclude-input"[^>]*>/s)[0]),
-     '駅名入力に autocomplete="off" がある(自動入力バー抑止)');
   ok(/autocomplete="off"/.test(html.match(/<input[^>]*id="parent-code"[^>]*>/s)[0]),
      'PIN入力に autocomplete="off" がある');
 }
@@ -469,11 +467,13 @@ console.log('\n[13] 自動入力バーの抑止');
 {
   ok(!/id="new-pin"/.test(html), 'idから "pin" を外した(パスワードマネージャ対策)');
   const forms = html.match(/<form[^>]*>/g) || [];
-  ok(forms.length >= 2, '入力欄が form で包まれている');
+  ok(forms.length >= 1, '残った入力欄は form で包まれている');
   ok(forms.every(f => /autocomplete="off"/.test(f)), 'form に autocomplete="off" がある');
-  const sta = html.match(/<input[^>]*id="pre-exclude-input"[^>]*>/s)[0];
-  ok(/data-lpignore/.test(sta), '駅名入力に data-lpignore がある');
-  ok(/name="mq-/.test(sta), '駅名入力の name が自動入力を誘発しない名前になっている');
+  /* 自動入力バー(鍵/カード/住所)はOS側が <input> に対して出すため、
+     属性では抑止しきれなかった。駅名の自由入力欄そのものを廃止した */
+  ok(!/pre-exclude-input/.test(html), '駅名の自由入力欄を廃止した');
+  ok(!/<datalist/.test(html), '駅名のdatalistも残っていない');
+  ok(!/function preExclude/.test(html), '未使用になった preExclude() が残っていない');
   const pc = html.match(/<input[^>]*id="parent-code"[^>]*>/s)[0];
   ok(/name="mq-/.test(pc), 'あいことば入力の name も同様');
 
@@ -499,6 +499,51 @@ console.log('\n[14] ⭐表記');
   eq(w.eval('rewardValue("★★")'), 2, '★(記号)でも数えられる(後方互換)');
   ok(!/★/.test(html.match(/stamps: \[[^\]]*\]/s)[0]), '抽選表に★(記号)が残っていない');
   eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+
+/* ---------- 15. 未編集の★テーブルを⭐へ移行 ---------- */
+console.log('\n[15] ★ → ⭐ の移行');
+{
+  /* v2で保存された「記号の★」の表。手を入れていないので⭐に差し替わる */
+  const v2 = [
+    {label:"★", w:30},{label:"★★", w:26},{label:"★★★", w:22},
+    {label:"★★★★", w:14},{label:"★★★★★", w:8}
+  ];
+  const st = { settings:{ lines:['G'], areas:['tokyo23'], spinsPerDay:20,
+                          targets:[{label:'A',w:1}], missions:['m'], stamps:v2, rewardMode:'stamp' },
+               spinsLeft:null, excluded:[], history:[], totalMoney:0, pin:null, noticeSeen:true };
+  const { w, errors } = boot({ mqgo_v1: JSON.stringify(st) });
+  const cur = w.eval('settings.stamps');
+  ok(cur.every(r => /^⭐+$/.test(r.label)), `未編集の★表は⭐に差し替わる (${cur.map(r=>r.label).join()})`);
+  eq(cur.length, 5, '段階数は変わらない');
+  eq(cur[0].w, 30, '重みは引き継がれる');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 保護者が書きかえた表は触らない(review-core: カスタマイズ済みは上書きしない) */
+  const edited = [
+    {label:"★", w:50},{label:"★★", w:26},{label:"★★★", w:22},
+    {label:"★★★★", w:14},{label:"★★★★★", w:8}
+  ];
+  const st = { settings:{ lines:['G'], areas:['tokyo23'], spinsPerDay:20,
+                          targets:[{label:'A',w:1}], missions:['m'], stamps:edited, rewardMode:'stamp' },
+               spinsLeft:null, excluded:[], history:[], totalMoney:0, pin:null, noticeSeen:true };
+  const { w } = boot({ mqgo_v1: JSON.stringify(st) });
+  eq(w.eval('settings.stamps')[0].label, '★', '重みを変えてあれば書き換えない');
+  eq(w.eval('settings.stamps')[0].w, 50, '編集内容が保持される');
+  w.close();
+}
+{
+  const custom = [{label:"にく1こ", w:10},{label:"にく2こ", w:5}];
+  const st = { settings:{ lines:['G'], areas:['tokyo23'], spinsPerDay:20,
+                          targets:[{label:'A',w:1}], missions:['m'], stamps:custom, rewardMode:'stamp' },
+               spinsLeft:null, excluded:[], history:[], totalMoney:0, pin:null, noticeSeen:true };
+  const { w } = boot({ mqgo_v1: JSON.stringify(st) });
+  eq(w.eval('settings.stamps').length, 2, '自作の表は件数ごと保持される');
+  eq(w.eval('settings.stamps')[0].label, 'にく1こ', '自作のラベルも保持される');
   w.close();
 }
 

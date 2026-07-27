@@ -294,15 +294,7 @@
     </div>
 
     <div class="sec">
-      <h4>🚫 事前除外(駅の検索登録)</h4>
-      <form class="edit-row" autocomplete="off" onsubmit="preExclude();return false;">
-        <input type="search" id="pre-exclude-input" list="station-datalist" placeholder="駅名を入力…"
-               name="mq-station-filter" enterkeyhint="done" inputmode="text"
-               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-               data-lpignore="true" data-form-type="other">
-        <datalist id="station-datalist"></datalist>
-        <button type="button" class="small-btn" onclick="preExclude()">除外に追加</button>
-      </form>
+      <h4>🚫 事前除外(駅を選んで除外)</h4>
       <div class="note">路線を選ぶと駅一覧が出ます。タップで除外⇔解除を切り替え。</div>
       <div class="edit-row">
         <select id="line-pick" onchange="renderLineStations()" style="flex-grow:1;"></select>
@@ -574,7 +566,7 @@ function rewardValue(label) {
      同一オリジンに家族版の旧キーが残っている可能性があり、
      拾うと他アプリのデータを取り込んでしまうため。
    ========================================================= */
-const APP_VER = 'v3';
+const APP_VER = 'v4';
 const APP_KEY = 'mqgo_v1';
 
 /* totalMoney: ごほうびの累計。stampモードでは「こ」、moneyモードでは「円」。
@@ -609,9 +601,28 @@ let currentResult = { station:"", mission:"", money:"", target:"" };
 let lastStation = "";
 let missionBag = [];
 
+/* v2までのスタンプ表(記号の★)。未編集ならv3の⭐へ入れ替える。
+   保護者が中身を書き換えている場合は触らない(review-core: カスタマイズ済みは上書きしない) */
+/* const だと loadSettings() の呼び出し(ファイル上方)より後ろの宣言になり
+   TDZ で落ちる。関数宣言にして巻き上げさせる */
+function legacyStampsV2() {
+  return [
+    {label:"★", w:30},{label:"★★", w:26},{label:"★★★", w:22},
+    {label:"★★★★", w:14},{label:"★★★★★", w:8}
+  ];
+}
+function isUnedited(cur, base) {
+  if (!Array.isArray(cur) || cur.length !== base.length) return false;
+  return cur.every((x,i) => x && x.label === base[i].label && (+x.w||0) === base[i].w);
+}
+
 function loadSettings() {
   const s = store.settings;
   if (!s || !s.lines || !s.targets || !s.missions) return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+  /* 未編集の★テーブルだけを⭐に差し替える */
+  if (isUnedited(s.stamps, legacyStampsV2())) {
+    s.stamps = JSON.parse(JSON.stringify(DEFAULT_SETTINGS.stamps));
+  }
   /* 旧バージョンの保存に無い項目だけをデフォルトで補う。
      ユーザーが編集済みの項目は上書きしない */
   const d = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
@@ -890,13 +901,6 @@ function resetExcluded() {
   store.excluded = excludedStations; saveStore();
   renderExcluded(); updateSummary();
 }
-function preExclude() {
-  const v = document.getElementById('pre-exclude-input').value.trim().replace(/駅$/,'');
-  if (!v) return;
-  if (!STATIONS[v]) { alert(`「${v}」はリストに見つかりませんでした`); return; }
-  addExclude(v);
-  document.getElementById('pre-exclude-input').value = "";
-}
 function renderLineStations() {
   const l = document.getElementById('line-pick').value;
   const box = document.getElementById('line-station-list');
@@ -949,9 +953,6 @@ function renderSettings() {
     html += `</div>`;
   }
   document.getElementById('company-list').innerHTML = html;
-  // datalist
-  document.getElementById('station-datalist').innerHTML =
-    getCandidates(true).map(s=>`<option value="${s.name}">`).join('');
   // 路線ピッカー
   const pick = document.getElementById('line-pick');
   const prev = pick.value;
