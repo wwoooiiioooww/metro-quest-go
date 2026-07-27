@@ -84,30 +84,146 @@
     padding:10px 12px; font-size:1.2em; cursor:pointer; flex-shrink:0;
   }
 
-  .slot-container { display:flex; flex-direction:column; gap:10px; max-width:400px; margin:0 auto; }
-  .reel-row {
-    display:flex; align-items:center; justify-content:space-between;
-    background:var(--panel); border:3px solid var(--line); border-radius:10px;
-    padding:10px; box-shadow:inset 0 0 10px #000;
+  /* =======================================================
+     運転台（画像素材なし・CSSのみ）
+     --spd : 車窓の流れる速さ。0s = 停車（アニメーション停止と同義）
+     --kmh : 速度計の値 0〜100
+     どちらも :root に置き、JSは setCab() から変数を書くだけにする
+     ======================================================= */
+  :root { --spd: 0s; --kmh: 0; }
+
+  /* ---- 前面展望 ---- */
+  #cab-view {
+    position:relative; max-width:400px; margin:0 auto 10px;
+    height:clamp(150px, 32vh, 250px); border-radius:14px; overflow:hidden;
+    background:#05070f; border:3px solid var(--line);
+    box-shadow:inset 0 0 30px #000; perspective:300px;
   }
-  .reel-label { font-size:0.8em; color:var(--grey); writing-mode:vertical-rl; text-orientation:upright; margin-right:5px; }
+  .tunnel-wrap { position:absolute; inset:0; transform-style:preserve-3d; }
+  /* 左右の壁を奥へ寝かせる。縞を流して「進んでいる」ことを表す */
+  .tunnel {
+    position:absolute; top:-20%; bottom:-20%; width:52%;
+    background-image:repeating-linear-gradient(
+      to bottom, #10182e 0 14px, #0a1020 14px 30px);
+    animation:rush var(--spd) linear infinite;
+  }
+  .tunnel.left  { left:0;  transform:rotateY(52deg);  transform-origin:left center; }
+  .tunnel.right { right:0; transform:rotateY(-52deg); transform-origin:right center; }
+  /* 天井の照明。壁より速く流して視差を出す */
+  .ceiling {
+    position:absolute; top:0; left:0; right:0; height:34%;
+    background-image:repeating-linear-gradient(
+      to bottom, rgba(180,220,255,.30) 0 3px, transparent 3px 46px);
+    transform:rotateX(58deg); transform-origin:top center;
+    animation:rush calc(var(--spd) * 0.55) linear infinite;
+  }
+  .floor {
+    position:absolute; bottom:0; left:0; right:0; height:30%;
+    background-image:repeating-linear-gradient(
+      to bottom, #0d1428 0 4px, transparent 4px 34px);
+    transform:rotateX(-58deg); transform-origin:bottom center;
+    animation:rush calc(var(--spd) * 0.8) linear infinite;
+  }
+  @keyframes rush { to { background-position-y:120px; } }
+  /* 奥の光点（トンネルの出口）。減速すると大きくなる */
+  #cab-view::after {
+    content:""; position:absolute; left:50%; top:48%; transform:translate(-50%,-50%);
+    width:44px; height:30px; border-radius:50%;
+    background:radial-gradient(ellipse, rgba(160,210,255,.55), transparent 70%);
+    transition:width .6s, height .6s, opacity .6s;
+  }
+  #cab-view.arriving::after { width:150px; height:110px; }
+  #cab-view.stopped::after { opacity:.25; }
+  /* 到着時にせり上がる駅名標 */
+  #station-sign {
+    position:absolute; left:50%; bottom:14px; transform:translate(-50%, 60px);
+    background:#f8f8f8; color:#111; font-weight:bold; font-size:1.15em;
+    padding:7px 22px; border-radius:6px; border:3px solid #1b4a9c;
+    opacity:0; transition:transform .55s cubic-bezier(.2,.9,.3,1.2), opacity .4s;
+    white-space:nowrap; max-width:88%; overflow:hidden; text-overflow:ellipsis;
+  }
+  #station-sign.on { transform:translate(-50%, 0); opacity:1; }
+
+  /* ---- 運転台 ---- */
+  #cab-console {
+    max-width:400px; margin:0 auto; background:var(--panel);
+    border:3px solid var(--line); border-radius:12px; padding:10px;
+    box-shadow:inset 0 0 14px #000;
+  }
+  .console-top { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  /* LED方向幕 */
+  #dest-board {
+    flex-grow:1; min-width:0; background:#080d06; border-radius:6px;
+    border:2px solid #0f3460; padding:8px 10px; text-align:left; overflow:hidden;
+    background-image:radial-gradient(rgba(0,0,0,.55) 32%, transparent 33%);
+    background-size:3px 3px;
+  }
+  .dest-label { color:#4f8f3a; font-size:0.62em; letter-spacing:2px; display:block; }
+  #dest-text {
+    color:#7CFC55; font-size:1.05em; font-weight:bold; letter-spacing:2px;
+    text-shadow:0 0 8px rgba(124,252,85,.6); white-space:nowrap;
+    display:block; overflow:hidden; text-overflow:ellipsis;
+  }
+  /* 速度計 */
+  #speedo {
+    position:relative; flex-shrink:0; width:74px; height:74px; border-radius:50%;
+    background:conic-gradient(from 220deg,
+      var(--cyan) 0 calc(var(--kmh) * 1%), #0b1330 calc(var(--kmh) * 1%) 78%, transparent 78%);
+    border:2px solid var(--line); display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+  }
+  #speedo::before {
+    content:""; position:absolute; inset:9px; border-radius:50%; background:var(--panel);
+  }
+  #speedo .needle {
+    position:absolute; left:50%; bottom:50%; width:2px; height:26px; background:var(--red);
+    transform-origin:bottom center; border-radius:2px;
+    transform:translateX(-50%) rotate(calc(-140deg + var(--kmh) * 2.8deg));
+    transition:transform .35s ease-out; z-index:2;
+  }
+  #speedo-num { position:relative; z-index:2; font-size:1.05em; font-weight:bold; color:#fff; line-height:1; }
+  #speedo .kmh { position:relative; z-index:2; font-size:0.5em; color:var(--grey); }
+
+  /* ---- 表示器とブレーキ ---- */
+  .slot-container { display:flex; flex-direction:column; gap:7px; }
+  .reel-row {
+    display:flex; align-items:center; gap:7px;
+    background:#0b1020; border:2px solid #0f3460; border-radius:8px; padding:6px;
+  }
+  .reel-label {
+    font-size:0.62em; color:var(--grey); writing-mode:vertical-rl; text-orientation:upright;
+    letter-spacing:1px; flex-shrink:0;
+  }
   .reel-box {
-    flex-grow:1; font-size:1.15em; font-weight:bold; color:#fff; height:52px;
+    flex-grow:1; min-width:0; font-size:1.05em; font-weight:bold; color:#7CFC55; height:50px;
     display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden;
-    background:#000; border-radius:5px; margin-right:10px;
-    text-align:center; white-space:pre-wrap; line-height:1.15;
+    background:#050a04; border-radius:5px; text-align:center; white-space:pre-wrap; line-height:1.15;
+    background-image:radial-gradient(rgba(0,0,0,.5) 32%, transparent 33%); background-size:3px 3px;
+    text-shadow:0 0 7px rgba(124,252,85,.45);
   }
   .line-chips { display:flex; gap:3px; flex-wrap:wrap; justify-content:center; margin-top:2px; }
-  .lc { font-size:0.55em; padding:1px 5px; border-radius:8px; color:#fff; font-weight:bold; }
+  .lc { font-size:0.55em; padding:1px 5px; border-radius:8px; color:#fff; font-weight:bold; text-shadow:none; }
+  /* ブレーキレバー */
   .stop-btn {
-    background-color:var(--red); color:#fff; border:none; border-radius:50px;
-    padding:10px 15px; font-size:1em; font-weight:bold; cursor:pointer; box-shadow:0 4px #c0392b;
+    flex-shrink:0; width:50px; height:62px; padding:0 0 5px; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+    background:linear-gradient(180deg,#3a4a63,#22304a); color:#fff;
+    border:2px solid #55688a; border-radius:8px; font-size:0.5em; font-weight:bold;
+    box-shadow:0 4px #16203a; transition:transform .12s, box-shadow .12s;
   }
-  .stop-btn:active { transform:translateY(4px); box-shadow:0 0 #c0392b; }
-  .stop-btn:disabled { background-color:#555; box-shadow:0 4px #333; transform:none; }
+  .stop-btn .knob {
+    width:22px; height:22px; border-radius:50%; margin-bottom:5px;
+    background:radial-gradient(circle at 35% 30%, #ff8a80, var(--red));
+    box-shadow:0 2px 4px #000; transition:transform .12s;
+  }
+  .stop-btn:active, .stop-btn.pulled { transform:translateY(4px); box-shadow:0 0 #16203a; }
+  .stop-btn:active .knob, .stop-btn.pulled .knob { transform:translateY(6px); }
+  .stop-btn:disabled { background:#2a3244; border-color:#3a4358; color:#6b7590; box-shadow:0 4px #1a2030; }
+  .stop-btn:disabled .knob { background:#4a5468; box-shadow:none; }
+
   #start-btn {
-    background-color:var(--gold); color:#111; border:none; border-radius:50px;
-    padding:15px 30px; font-size:1.4em; font-weight:bold; margin-top:15px;
+    background:linear-gradient(180deg,#f7d117,var(--gold)); color:#111; border:none; border-radius:50px;
+    padding:15px 30px; font-size:1.3em; font-weight:bold; margin-top:14px;
     cursor:pointer; box-shadow:0 5px var(--orange); width:90%; max-width:350px;
   }
   #start-btn:active { transform:translateY(5px); box-shadow:0 0 var(--orange); }
@@ -185,10 +301,11 @@
   textarea { width:100%; box-sizing:border-box; min-height:180px; line-height:1.5; }
   .del-btn { background:var(--red); color:#fff; border:none; border-radius:6px; padding:6px 10px; cursor:pointer; }
   .note { font-size:0.75em; color:var(--grey); margin:4px 0; line-height:1.5; }
-  #save-btn {
+  #save-btn, #lock-btn {
     background:var(--green); color:#fff; border:none; border-radius:50px; padding:12px 20px;
     font-size:1.05em; font-weight:bold; cursor:pointer; width:100%; margin-top:12px; box-shadow:0 4px #27ae60;
   }
+  #save-btn:active, #lock-btn:active { transform:translateY(4px); box-shadow:0 0 #27ae60; }
   /* 紙吹雪 */
   .confetti { position:fixed; top:-10%; font-size:1.6em; pointer-events:none; animation:fall 2.2s linear forwards; z-index:99; }
   @keyframes fall { to { transform:translateY(115vh) rotate(540deg); opacity:0.8; } }
@@ -220,30 +337,56 @@
     <button id="gear-btn" onclick="openSettings()">⚙️</button>
   </div>
 
-  <div class="slot-container">
-    <div class="reel-row">
-      <div class="reel-label">行き先</div>
-      <div class="reel-box" id="reel-0">---</div>
-      <button class="stop-btn" id="stop-0" onclick="stopReel(0)" disabled>STOP</button>
+  <!-- 前面展望。壁と照明が奥から手前へ流れる -->
+  <div id="cab-view" class="stopped">
+    <div class="tunnel-wrap">
+      <div class="tunnel left"></div>
+      <div class="tunnel right"></div>
+      <div class="ceiling"></div>
+      <div class="floor"></div>
     </div>
-    <div class="reel-row">
-      <div class="reel-label">指令</div>
-      <div class="reel-box" id="reel-1">---</div>
-      <button class="stop-btn" id="stop-1" onclick="stopReel(1)" disabled>STOP</button>
+    <div id="station-sign"></div>
+  </div>
+
+  <!-- 運転台 -->
+  <div id="cab-console">
+    <div class="console-top">
+      <div id="dest-board">
+        <span class="dest-label">つぎは</span>
+        <span id="dest-text">＿＿＿＿</span>
+      </div>
+      <div id="speedo">
+        <div class="needle"></div>
+        <div id="speedo-num">0</div>
+        <div class="kmh">km/h</div>
+      </div>
     </div>
-    <div class="reel-row">
-      <div class="reel-label" id="reel-label-2">スタンプ</div>
-      <div class="reel-box" id="reel-2" style="color:#f1c40f;">---</div>
-      <button class="stop-btn" id="stop-2" onclick="stopReel(2)" disabled>STOP</button>
-    </div>
-    <div class="reel-row">
-      <div class="reel-label">対象者</div>
-      <div class="reel-box" id="reel-3" style="color:#00d2d3;">---</div>
-      <button class="stop-btn" id="stop-3" onclick="stopReel(3)" disabled>STOP</button>
+
+    <div class="slot-container">
+      <div class="reel-row">
+        <div class="reel-label">行き先</div>
+        <div class="reel-box" id="reel-0">---</div>
+        <button class="stop-btn" id="stop-0" onclick="stopReel(0)" disabled><span class="knob"></span>ブレーキ</button>
+      </div>
+      <div class="reel-row">
+        <div class="reel-label">指令</div>
+        <div class="reel-box" id="reel-1">---</div>
+        <button class="stop-btn" id="stop-1" onclick="stopReel(1)" disabled><span class="knob"></span>ブレーキ</button>
+      </div>
+      <div class="reel-row">
+        <div class="reel-label" id="reel-label-2">スタンプ</div>
+        <div class="reel-box" id="reel-2" style="color:#f1c40f;">---</div>
+        <button class="stop-btn" id="stop-2" onclick="stopReel(2)" disabled><span class="knob"></span>ブレーキ</button>
+      </div>
+      <div class="reel-row">
+        <div class="reel-label">対象者</div>
+        <div class="reel-box" id="reel-3" style="color:#00d2d3;">---</div>
+        <button class="stop-btn" id="stop-3" onclick="stopReel(3)" disabled><span class="knob"></span>ブレーキ</button>
+      </div>
     </div>
   </div>
 
-  <button id="start-btn" onclick="startAll()">スピン開始!</button>
+  <button id="start-btn" onclick="startAll()">🚃 発車</button>
   <button id="clear-btn" onclick="clearMission()">⭐ ミッション達成!スタンプGET</button>
   <div id="bonus-msg"></div>
 
@@ -391,9 +534,7 @@
     <div class="sec">
       <h4>🔒 保護者モードのロック</h4>
       <div class="note">お子さまに端末をわたす前にロックしてください。次に「せってい」を開くときは、あいことばの入力が必要になります。</div>
-      <div style="text-align:center;">
-        <button class="small-btn" id="lock-btn" onclick="lockParent()" style="background:#e74c3c;">🔒 いますぐロックする</button>
-      </div>
+      <button id="lock-btn" onclick="lockParent()">🔒 いますぐロックする</button>
     </div>
 
     <div class="sec">
