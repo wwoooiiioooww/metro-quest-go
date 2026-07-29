@@ -1540,6 +1540,190 @@ console.log('\n[43] 累計はモードごとに分ける');
   w.close();
 }
 
+/* ---------- 44. 記録は「きっぷ」 ---------- */
+console.log('\n[44] きっぷ風の記録');
+{
+  const { w, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.eval(`history = [{ station:'上野', mission:'カラーマンホールをさがす', money:'⭐3こ',
+                      target:'こども1', date:todayKey(), mode:'stamp', time:'10:24' }]`);
+  w.eval('renderHistory()');
+  const t = w.document.querySelector('.ticket');
+  ok(t, 'きっぷが1枚描かれる');
+  eq(t.querySelector('.tk-station').textContent, '上野', '駅名が主役');
+  eq(t.querySelector('.tk-time').textContent, '10:24', '時刻が出る');
+  eq(t.querySelector('.tk-who').textContent, 'こども1', 'だれが出る');
+  eq(t.querySelector('.tk-reward').textContent, '⭐3こ', 'ごほうびが出る');
+  ok(t.querySelector('.tk-mission').textContent.includes('マンホール'), '指令が出る');
+  ok(t.querySelectorAll('.lc').length > 0, '路線カラーのバッジがつく');
+  ok(/--tc:#[0-9a-f]{6}/i.test(t.getAttribute('style')), '路線カラーの帯がつく');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 指令は保護者が自由に書ける。タグを書いても崩れないこと */
+  const { w } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.eval(`history = [{ station:'上野', mission:'<b>ふとじ</b>', money:'⭐1こ', target:'みんな', time:'9:00' }]`);
+  w.eval('renderHistory()');
+  const t = w.document.querySelector('.ticket');
+  ok(!t.querySelector('b'), 'ミッション内のタグが要素にならない');
+  ok(t.textContent.includes('<b>ふとじ</b>'), '書いたとおりの文字で見える');
+  /* マスタに無い駅名でも落ちない（保護者が記録を手で書き換えた場合など） */
+  w.eval(`history = [{ station:'そんな駅ない', mission:'m', money:'⭐1こ', target:'みんな', time:'9:00' }]`);
+  w.eval('renderHistory()');
+  ok(w.document.querySelector('.ticket'), 'マスタに無い駅でも描ける');
+  w.close();
+}
+{
+  const { w } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.eval('history = []'); w.eval('renderHistory()');
+  ok(w.document.querySelector('.history-empty'), '記録が無いときの表示がある');
+  eq(w.document.querySelectorAll('.ticket').length, 0, 'きっぷは0枚');
+  w.close();
+}
+
+/* ---------- 45. 行った駅コレクション ---------- */
+/* 「除外リスト」という後ろ向きな見せ方を、制覇率に変えたもの。
+   ⭐=アプリで達成した駅 / ✓=手で塗った駅 */
+console.log('\n[45] 行った駅コレクション');
+{
+  const { w, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.eval(`history = [{ station:'上野', mission:'m', money:'⭐1こ', target:'みんな', date:todayKey(), mode:'stamp', time:'9:00' }]`);
+  w.eval(`excludedStations = ['浅草']`);
+  w.eval('switchTab("log")');
+
+  const got = [...w.document.querySelectorAll('.cl-st.got')].map(e => e.textContent.trim());
+  const mk  = [...w.document.querySelectorAll('.cl-st.marked')].map(e => e.textContent.trim());
+  ok(got.some(s => s.startsWith('上野')), '達成した駅が⭐で塗られる');
+  ok(got.every(s => s.includes('⭐')), '達成した駅には⭐がつく');
+  ok(mk.some(s => s.startsWith('浅草')), '手で塗った駅が✓で塗られる');
+  ok(mk.every(s => s.includes('✓')), '手で塗った駅には✓がつく');
+
+  const total = w.document.getElementById('collect-total').textContent;
+  ok(/\d+ \/ \d+ 駅/.test(total), `制覇数が出る (${total})`);
+  ok(w.document.querySelectorAll('.cl-line').length > 0, '路線ごとに分かれている');
+  ok(w.document.querySelectorAll('.cl-bar > i').length > 0, '路線ごとの進捗バーがある');
+
+  /* 選んでいる路線だけを出す（374駅ぜんぶは出さない） */
+  eq(w.document.querySelectorAll('.cl-line').length, w.eval('settings.lines.length'),
+     '選んでいる路線の数だけ並ぶ');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 達成すると、その場でコレクションが増える */
+  const { w } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.eval('switchTab("log")');
+  const before = w.document.querySelectorAll('.cl-st.got').length;
+  w.eval('switchTab("play")');
+  w.eval('startAll()');
+  for (let i = 0; i < 4; i++) w.eval('pullBrake()');
+  w.eval('confirmClear()'); w.eval('confirmClear()');
+  const after = w.document.querySelectorAll('.cl-st.got').length;
+  ok(after > before, `達成でコレクションが増える (${before} → ${after})`);
+  w.close();
+}
+{
+  /* 二重に数えない: 達成ずみの駅を手で塗っても制覇数は増えない */
+  const { w } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.eval(`history = [{ station:'上野', mission:'m', money:'⭐1こ', target:'みんな', time:'9:00' }]`);
+  w.eval(`excludedStations = []`); w.eval('renderCollection()');
+  const n1 = +w.document.getElementById('collect-total').textContent.match(/(\d+) \//)[1];
+  w.eval(`excludedStations = ['上野']`); w.eval('renderCollection()');
+  const n2 = +w.document.getElementById('collect-total').textContent.match(/(\d+) \//)[1];
+  eq(n2, n1, '同じ駅を二重に数えない');
+  w.close();
+}
+
+/* ---------- 46. まちあわせコード ---------- */
+/* そろえるのは駅だけ。指令・ごほうび・だれ は各家庭の設定のまま。通信はしない */
+console.log('\n[46] まちあわせコード');
+{
+  const { w } = boot();
+  const names = JSON.parse(w.eval('JSON.stringify(Object.keys(STATIONS))'));
+  /* これが崩れたら、別の駅を指すコードが生まれる。駅を足したら必ずここで落ちる */
+  const seen = new Map(); const col = [];
+  for (const nm of names) {
+    const c = w.eval(`meetCodeOf(${JSON.stringify(nm)})`);
+    if (seen.has(c)) col.push(`${seen.get(c)}/${nm}`);
+    seen.set(c, nm);
+  }
+  eq(col.length, 0, `全${names.length}駅でコードが重複しない (${col.join(', ')})`);
+  eq(w.eval('MEET_LEN'), 4, 'コードは4文字');
+  for (const nm of ['上野', '新宿', '浅草']) {
+    eq(w.eval(`meetCodeOf(${JSON.stringify(nm)}).length`), 4, `${nm} のコードが4文字`);
+    eq(w.eval(`stationByMeetCode(meetCodeOf(${JSON.stringify(nm)}))`), nm, `${nm} は往復できる`);
+  }
+  eq(w.eval('stationByMeetCode(meetCodeOf("新宿").toLowerCase())'), '新宿', '小文字でも通る');
+  eq(w.eval('stationByMeetCode("AB")'), null, '短いコードは null');
+  eq(w.eval('stationByMeetCode("")'), null, '空でも落ちない');
+  eq(w.eval('stationByMeetCode(null)'), null, 'null でも落ちない');
+  w.close();
+}
+{
+  /* 出す側 → 入れる側。駅だけが一致し、あとは自分で回す */
+  const A = boot(); A.w.eval('hideSplash()'); A.w.eval('closeNotice()');
+  A.w.eval('startAll()');
+  ok(!A.w.document.getElementById('meet-row').classList.contains('on'), '駅が決まる前はコードを出さない');
+  A.w.eval('pullBrake()');
+  const code = A.w.document.getElementById('meet-code').textContent;
+  const stA = A.w.eval('currentResult.station');
+  ok(A.w.document.getElementById('meet-row').classList.contains('on'), '駅が決まったらコードが出る');
+  eq(code, A.w.eval(`meetCodeOf(${JSON.stringify(stA)})`), '出ているコードが駅と一致する');
+  eq(A.errors.length, 0, 'runtime errors: none');
+  A.w.close();
+
+  const B = boot(); B.w.eval('hideSplash()'); B.w.eval('closeNotice()');
+  B.w.eval('startAll()');
+  B.w.prompt = () => code;
+  B.w.eval('joinMeetCode()');
+  eq(B.w.eval('currentResult.station'), stA, '同じ駅になる');
+  eq(B.w.eval('isRunning[0]'), false, '行き先は確定ずみ');
+  eq(B.w.eval('runningCount()'), 3, '残り3つは自分で回す');
+  ok(B.w.eval('activeReel') !== 0, 'ブレーキは次へ進んでいる');
+  B.w.eval('pullBrake()'); B.w.eval('pullBrake()'); B.w.eval('pullBrake()');
+  eq(B.w.eval('currentResult.station'), stA, '最後まで駅は変わらない');
+  ok(B.w.eval('currentResult.mission').length > 0, '指令は自分の設定から出る');
+  ok(B.w.eval('currentResult.target').length > 0, 'だれも自分の設定から出る');
+  eq(B.errors.length, 0, 'runtime errors: none');
+  B.w.close();
+}
+{
+  /* 使えない場面と、まちがったコード */
+  const { w, alerts } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.prompt = () => 'ZZZZ';
+  w.eval('joinMeetCode()');
+  ok(alerts.some(a => a.includes('はっしゃ')), '発車前は「はっしゃして」と言う');
+  eq(w.eval('currentResult.station'), '', '駅は入らない');
+
+  w.eval('startAll()');
+  w.eval('joinMeetCode()');
+  ok(alerts.some(a => a.includes('見つかりませんでした')), '知らないコードは断る');
+  eq(w.eval('runningCount()'), 4, '断ったときは何も変えない');
+
+  w.prompt = () => null;              /* キャンセル */
+  w.eval('joinMeetCode()');
+  eq(w.eval('runningCount()'), 4, 'キャンセルでも何も変えない');
+  w.close();
+}
+{
+  /* 除外している駅でも、指定されたら従う（待ち合わせだから） */
+  const { w } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.eval('startAll()');
+  w.eval(`excludedStations = ['浅草']`);
+  w.prompt = () => w.eval('meetCodeOf("浅草")');
+  w.eval('joinMeetCode()');
+  eq(w.eval('currentResult.station'), '浅草', '「行った」で塗ってある駅でも指定できる');
+  w.close();
+}
+
 /* ---------- 結果 ---------- */
 console.log(`\n${'='.repeat(46)}`);
 console.log(`  passed: ${passed}  failed: ${failed}`);

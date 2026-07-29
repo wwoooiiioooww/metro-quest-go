@@ -308,7 +308,91 @@
     border-radius:10px; padding:10px; text-align:left;
   }
   .panel h3 { color:var(--cyan); font-size:1em; margin:5px 0 8px; text-align:center; }
-  .history-item { font-size:0.85em; padding:4px 0; border-bottom:1px solid var(--line); }
+  /* ---- 冒険の記録：きっぷ風のカード ----
+     1件を1枚の切符に見立てる。左に路線カラーの帯、右端に
+     切り取り線のギザギザ。子どもが「集めたくなる」形にする */
+  #history-list { text-align:left; }
+  .ticket {
+    position:relative; display:block; margin:0 0 9px;
+    background:linear-gradient(160deg,#fdfbf3,#efe7d2);
+    border-radius:7px; padding:9px 30px 9px 15px;
+    color:#2b2b2b; font-size:0.85em; overflow:hidden;
+    box-shadow:0 2px 0 rgba(0,0,0,.45);
+  }
+  /* 左端の帯。路線カラーを --tc に入れて使う */
+  .ticket::before {
+    content:''; position:absolute; left:0; top:0; bottom:0; width:7px;
+    background:var(--tc, #8395a7);
+  }
+  /* 右端の切り取り線。円を並べてギザギザに見せる */
+  .ticket::after {
+    content:''; position:absolute; right:8px; top:0; bottom:0; width:2px;
+    background-image:radial-gradient(circle, #cbbfa4 1px, transparent 1.2px);
+    background-size:2px 7px;
+  }
+  .tk-top {
+    display:flex; align-items:baseline; gap:7px;
+    border-bottom:1px dashed #c9bda2; padding-bottom:5px; margin-bottom:5px;
+  }
+  .tk-station { font-size:1.25em; font-weight:bold; letter-spacing:1px; line-height:1.2; }
+  .tk-time { margin-left:auto; font-size:0.85em; color:#7a6f57; font-variant-numeric:tabular-nums; }
+  .tk-lines { display:flex; gap:3px; flex-wrap:wrap; margin-bottom:5px; }
+  .tk-mission { line-height:1.35; }
+  .tk-foot {
+    display:flex; align-items:center; gap:6px; margin-top:6px;
+    font-size:0.9em; color:#5c5344;
+  }
+  .tk-who { background:#e2d8be; border-radius:10px; padding:1px 8px; font-weight:bold; }
+  /* ごほうびは「押した」感じを出したいので、傾けた赤いスタンプにする */
+  .tk-reward {
+    margin-left:auto; color:#c0392b; font-weight:bold;
+    border:2px solid #c0392b; border-radius:5px; padding:0 6px;
+    transform:rotate(-4deg); white-space:nowrap;
+  }
+  .history-empty { color:#8395a7; font-size:0.85em; text-align:center; padding:6px 0; }
+
+  /* ---- 行った駅コレクション ----
+     路線図は使わない（図版素材を持たない方針）。
+     路線ごとに駅名チップを並べて、行った駅だけ色をつける */
+  #collect-total { text-align:center; font-size:0.9em; margin-bottom:8px; }
+  #collect-total b { color:var(--cyan); font-size:1.5em; font-variant-numeric:tabular-nums; }
+  .cl-line { margin-bottom:9px; }
+  .cl-head {
+    display:flex; align-items:center; gap:6px;
+    font-size:0.8em; font-weight:bold; margin-bottom:3px;
+  }
+  .cl-dot { width:11px; height:11px; border-radius:50%; flex-shrink:0; }
+  .cl-count { margin-left:auto; color:#8395a7; font-variant-numeric:tabular-nums; }
+  /* 進捗バー。路線カラーで伸びる */
+  .cl-bar { height:4px; border-radius:2px; background:#1a2740; overflow:hidden; margin-bottom:4px; }
+  .cl-bar > i { display:block; height:100%; border-radius:2px; }
+  .cl-stations { display:flex; flex-wrap:wrap; gap:3px; }
+  .cl-st {
+    font-size:0.72em; padding:2px 6px; border-radius:9px; cursor:pointer;
+    border:1px solid #2c3a52; color:#5a6a82; background:#0d1526;
+  }
+  /* 達成した駅。⭐がつく */
+  .cl-st.got { color:#fff; border-color:transparent; font-weight:bold; }
+  /* 手で「行った」にした駅。塗るが、達成とは見分けられるようにする */
+  .cl-st.marked { color:#e8eef6; border-style:dashed; background:#1b2740; }
+  #collect-note { font-size:0.72em; color:#8395a7; text-align:center; margin-top:7px; line-height:1.5; }
+
+  /* ---- まちあわせコード ----
+     駅が決まったら4文字を出す。相手が入れると同じ駅になる。
+     通信はしない（コードそのものが情報を運ぶ） */
+  #meet-row { display:none; width:92%; max-width:360px; margin:9px auto 0; gap:7px; }
+  #meet-row.on { display:flex; align-items:center; }
+  #meet-code {
+    flex:1; text-align:center; font-size:1.35em; font-weight:bold; letter-spacing:5px;
+    color:#111; background:linear-gradient(180deg,#fdfbf3,#e6dcc4);
+    border:2px dashed #b7a681; border-radius:8px; padding:5px 0;
+    font-family:monospace; cursor:pointer;
+  }
+  #meet-label { font-size:0.68em; color:#8395a7; line-height:1.3; width:74px; flex-shrink:0; }
+  #meet-join {
+    background:#34597a; color:#fff; border:2px solid #4d7ea8; border-radius:9px;
+    padding:7px 11px; font-size:0.78em; font-weight:bold; cursor:pointer; flex-shrink:0;
+  }
   .excluded-tag {
     display:inline-block; background:#555; color:#fff; padding:3px 8px;
     margin:3px; border-radius:12px; font-size:0.8em; cursor:pointer;
@@ -523,6 +607,12 @@
     <button id="start-btn" onclick="startAll()">🚃 はっしゃ</button>
     <button id="brake-btn" onclick="pullBrake()" disabled><span class="knob"></span><span id="brake-label">ブレーキ</span></button>
   </div>
+  <!-- 駅が決まったら出る。友だちに見せると同じ駅にできる -->
+  <div id="meet-row">
+    <div id="meet-label">まちあわせ<br>コード</div>
+    <div id="meet-code" onclick="copyMeetCode()">----</div>
+    <button id="meet-join" onclick="joinMeetCode()">コードを<br>いれる</button>
+  </div>
   <button id="clear-btn" onclick="confirmClear()">⭐ ミッション達成!スタンプGET</button>
   <div id="bonus-msg"></div>
 
@@ -530,13 +620,19 @@
 
   <div class="tab-pane" id="tab-log">
 
-  <!-- 除外(クイック操作) -->
+  <!-- 行った駅コレクション（もとの「除外リスト」を前向きな見せ方にしたもの） -->
   <div class="panel">
-    <h3>🚫 行った駅の除外</h3>
-    <div style="text-align:center;">
-      <button class="small-btn" onclick="excludeCurrent()">今出ている駅を除外する</button>
+    <h3>🗺️ 行った駅コレクション</h3>
+    <div id="collect-total"></div>
+    <div id="collect-lines"></div>
+    <div style="text-align:center; margin-top:9px;">
+      <button class="small-btn" onclick="excludeCurrent()">今出ている駅を「行った」にする</button>
     </div>
-    <div id="excluded-list" style="margin-top:8px; text-align:center; color:#8395a7; font-size:0.85em;"></div>
+    <div id="collect-note">
+      ⭐ = このアプリで達成した駅　／　✓ = 手で「行った」にした駅<br>
+      駅名をタップすると切りかえられます。塗った駅はルーレットに出なくなります。
+    </div>
+    <div id="excluded-list" style="display:none"></div>
   </div>
 
   <!-- 冒険の記録 -->
@@ -865,6 +961,40 @@ function entryMode(h) {
 }
 
 /* =========================================================
+   2-b. まちあわせコード
+   友だちの端末で「同じ駅」にするための4文字。通信は一切しない。
+
+   そろえるのは駅だけ。指令・ごほうび・だれ は各家庭が自由に
+   編集できるので、コードで送っても相手の端末では再現できないし、
+   よその家の子に「100円」を約束してしまうのも筋が悪い。
+   駅マスタはアプリに同梱＝全端末で同じなので、駅だけは確実に一致する。
+
+   コードは駅名から作る（並び順ではなく）。並び順を使うと、
+   あとから駅を1つ足しただけで既存のコードが別の駅を指してしまう。
+   ========================================================= */
+const MEET_LEN = 4;              /* 36^4=1679616。全374駅で衝突0件（テストで固定） */
+const MEET_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+function meetHash(name) {
+  let x = 5381;
+  for (const ch of String(name)) x = ((x * 33) ^ ch.codePointAt(0)) >>> 0;
+  return x;
+}
+function meetCodeOf(name) {
+  let v = meetHash(name) % Math.pow(36, MEET_LEN);
+  let out = '';
+  for (let i = 0; i < MEET_LEN; i++) { out = MEET_ALPHABET[v % 36] + out; v = Math.floor(v / 36); }
+  return out;
+}
+/* コード → 駅名。見つからなければ null */
+function stationByMeetCode(code) {
+  const c = String(code || '').trim().toUpperCase().replace(/[^0-9A-Z]/g, '');
+  if (c.length !== MEET_LEN) return null;
+  for (const name of Object.keys(STATIONS)) if (meetCodeOf(name) === c) return name;
+  return null;
+}
+
+/* =========================================================
    3. 状態管理
    localStorageは単一キー(APP_KEY)に集約する。
    GitHub Pagesでは姉妹アプリが同一オリジンになるため、
@@ -874,7 +1004,7 @@ function entryMode(h) {
      同一オリジンに家族版の旧キーが残っている可能性があり、
      拾うと他アプリのデータを取り込んでしまうため。
    ========================================================= */
-const APP_VER = 'v15';
+const APP_VER = 'v16';
 const APP_KEY = 'mqgo_v1';
 
 /* 累計は種類ごとに分けて持つ。
@@ -1275,6 +1405,7 @@ function updateReelFocus() {
   if (label) label.textContent = anyRunning
     ? `ブレーキ\n${REEL_NAMES[activeReel]}`
     : 'ブレーキ';
+  updateMeetRow();
 }
 
 /* 大きなブレーキ1本で、いまの表示器を止める */
@@ -1411,6 +1542,57 @@ function getFairMission() {
 /* stopReel から次の表示器を回しはじめるときに使う駅の候補 */
 let spinAvail = [];
 
+/* 駅が決まっているあいだだけ、コードを出す */
+function updateMeetRow() {
+  const row = document.getElementById('meet-row');
+  const el  = document.getElementById('meet-code');
+  if (!row || !el) return;
+  const st = currentResult.station;
+  row.classList.toggle('on', !!st);
+  el.textContent = st ? meetCodeOf(st) : '----';
+}
+function copyMeetCode() {
+  const st = currentResult.station;
+  if (!st) return;
+  const code = meetCodeOf(st);
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).catch(() => {});
+    }
+  } catch (e) {}
+  alert(`まちあわせコード【${code}】\n\nともだちがこのコードを入れると、\nおなじ「${st}」になります。\n\n※ 指令とごほうびは、おうちごとにちがいます`);
+}
+/* コードを入れたら、その駅で確定させる。
+   路線がOFFでも「行った」で塗ってあっても、指定された駅を優先する
+   （待ち合わせなので、こちらの都合で外すほうがおかしい） */
+function joinMeetCode() {
+  /* 走行中に使うのが本来の使い方（行き先だけ先に決めてしまう）。
+     まだ発車していないときだけ断る */
+  if (!isRunning.some(Boolean) && !currentResult.station) {
+    alert('さきに「🚃 はっしゃ」を おしてね。'); return;
+  }
+  const input = prompt('ともだちの まちあわせコード（4文字）を入れてね');
+  if (input === null) return;
+  const name = stationByMeetCode(input);
+  if (!name) { alert('そのコードの駅が見つかりませんでした。\n4文字を もういちど たしかめてね。'); return; }
+  const st = STATIONS[name];
+  const wasRunning = isRunning.some(Boolean);
+
+  currentResult.station = name; lastStation = name;
+  const box = document.getElementById('reel-0');
+  if (box) { box.innerText = name; box.classList.remove('pending'); }
+  setDestFixed(st);
+  isRunning[0] = false;
+  clearInterval(intervals[0]); intervals[0] = null;
+  updateReelFocus(); updateMeetRow();
+
+  /* 指令などがまだなら、そのまま続きを回せるようにする */
+  const rest = nextRunningReel();
+  if (rest >= 0) { activeReel = rest; spinReel(rest, spinAvail.length ? spinAvail : getCandidates()); updateReelFocus(); }
+  else if (wasRunning) { checkAllStopped(); }   /* 確定ずみの回に入れ直しただけなら鳴らさない */
+  alert(`ともだちと おなじ「${name}」になりました!`);
+}
+
 /* いま順番が来た表示器だけを回す。
    4つ同時だと目が疲れる（実機のフィードバック）ので、
    回るのは常に1つ、ブレーキが向いている先だけにする */
@@ -1471,6 +1653,7 @@ function startAll() {
   }
   spinReel(activeReel, avail);
   updateReelFocus();
+  updateMeetRow();
   updateStartBtn();
 }
 
@@ -1504,6 +1687,7 @@ function stopReel(index) {
     if (currentResult.target === "みんな") { brothersSound(); box.style.textShadow = "0 0 12px #00d2d3"; }
     else box.style.textShadow = "none";
   }
+  updateMeetRow();      /* 駅が入るのは updateReelFocus より後 */
   checkAllStopped();
 }
 
@@ -1576,9 +1760,10 @@ function clearMission() {
   };
   history.unshift(entry);
   store.history = history; saveStore();
-  renderHistory(); updateHeader();
+  renderHistory(); renderCollection(); updateHeader();
   document.getElementById('clear-btn').style.display = 'none';
   currentResult = { station:"", mission:"", money:"", target:"" };
+  updateMeetRow();
 }
 
 /* =========================================================
@@ -1660,21 +1845,97 @@ function updateSummary() {
   document.getElementById('summary-text').innerHTML =
     `🎯 候補 <b>${n}</b> 駅 ｜ ${settings.areas.map(a=>areaNames[a]).join("+") || "エリアなし"} / ${cos}`;
 }
+/* 記録1件を、きっぷ1枚として描く。
+   駅名を主役にして、路線カラーで「どこへ行ったか」を一目で分からせる */
+function ticketHTML(h) {
+  const st = STATIONS[h.station];
+  const lines = st ? st.lines : [];
+  const tint = lines.length ? LINES[lines[0]].c : '#8395a7';
+  const badges = lines.map(l =>
+    `<span class="lc" style="background:${LINES[l].c}">${esc(LINES[l].n)}</span>`).join('');
+  return `<div class="ticket" style="--tc:${tint}">` +
+    `<div class="tk-top"><span class="tk-station">${esc(h.station)}</span>` +
+    `<span class="tk-time">${esc(h.time || '')}</span></div>` +
+    (badges ? `<div class="tk-lines">${badges}</div>` : '') +
+    `<div class="tk-mission">${esc(h.mission)}</div>` +
+    `<div class="tk-foot"><span class="tk-who">${esc(h.target)}</span>` +
+    `<span class="tk-reward">${esc(h.money)}</span></div>` +
+    `</div>`;
+}
 function renderHistory() {
   const list = document.getElementById('history-list');
-  if (history.length === 0) { list.innerHTML = "まだ記録がありません"; return; }
-  list.innerHTML = history.map(h =>
-    `<div class="history-item">` +
-    `<span class="stamp">⭐</span> ${esc(h.time)} 【${esc(h.station)}】${esc(h.mission)}` +
-    `<br>→ ${esc(h.target)} に ${esc(h.money)}</div>`
-  ).join('');
+  if (history.length === 0) {
+    list.innerHTML = '<div class="history-empty">まだ記録がありません</div>';
+    return;
+  }
+  list.innerHTML = history.map(ticketHTML).join('');
 }
+/* 達成した駅（記録に残っている駅）。除外とは別に持つ */
+function visitedStations() {
+  return new Set(history.map(h => h.station).filter(Boolean));
+}
+/* いま候補になりうる路線だけを見る。全374駅を出すと関係ない路線まで並ぶ */
+function collectLines() {
+  return settings.lines.filter(l => LINES[l]);
+}
+/* 路線ごとの駅一覧。エリア設定は効かせない
+   （「制覇」は路線まるごとで数えたほうが気持ちがいい） */
+function stationsOfLine(l) {
+  return Object.values(STATIONS).filter(st => st.lines.includes(l)).map(st => st.name);
+}
+
+function renderCollection() {
+  const box = document.getElementById('collect-lines');
+  const tot = document.getElementById('collect-total');
+  if (!box || !tot) return;
+  const got = visitedStations();
+  const marked = new Set(excludedStations);
+  const lines = collectLines();
+
+  /* 全体の制覇数。両方に入っている駅を二重に数えない */
+  const all = new Set();
+  const done = new Set();
+  for (const l of lines) for (const name of stationsOfLine(l)) {
+    all.add(name);
+    if (got.has(name) || marked.has(name)) done.add(name);
+  }
+  tot.innerHTML = all.size === 0
+    ? '<span style="color:#8395a7">路線が選ばれていません</span>'
+    : `<b>${done.size}</b> / ${all.size} 駅　いってきた!`;
+
+  box.innerHTML = lines.map(l => {
+    const names = stationsOfLine(l);
+    const c = LINES[l].c;
+    const d = names.filter(nm => got.has(nm) || marked.has(nm)).length;
+    const pct = names.length ? Math.round(d / names.length * 100) : 0;
+    const chips = names.map(nm => {
+      const isGot = got.has(nm), isMk = marked.has(nm);
+      const cls = isGot ? 'cl-st got' : (isMk ? 'cl-st marked' : 'cl-st');
+      const style = isGot ? ` style="background:${c}"` : '';
+      const mark = isGot ? ' ⭐' : (isMk ? ' ✓' : '');
+      return `<span class="${cls}"${style} onclick="toggleExcludeStation('${esc(nm)}')">` +
+             `${esc(nm)}${mark}</span>`;
+    }).join('');
+    return `<div class="cl-line">` +
+      `<div class="cl-head"><span class="cl-dot" style="background:${c}"></span>` +
+      `<span>${esc(LINES[l].n)}</span><span class="cl-count">${d}/${names.length}</span></div>` +
+      `<div class="cl-bar"><i style="width:${pct}%; background:${c}"></i></div>` +
+      `<div class="cl-stations">${chips}</div></div>`;
+  }).join('');
+}
+
+/* 除外リストは画面上はコレクションに置きかわったが、
+   既存の呼び出し元をすべて生かすため、ここから必ず再描画する */
 function renderExcluded() {
   const box = document.getElementById('excluded-list');
-  if (excludedStations.length === 0) { box.innerHTML = "除外中の駅:なし"; return; }
-  box.innerHTML = excludedStations.map(s =>
-    `<span class="excluded-tag" onclick="removeExcluded('${s}')">${s} ✕</span>`
-  ).join('');
+  if (box) {
+    box.innerHTML = excludedStations.length === 0
+      ? "除外中の駅:なし"
+      : excludedStations.map(s =>
+          `<span class="excluded-tag" onclick="removeExcluded('${esc(s)}')">${esc(s)} ✕</span>`
+        ).join('');
+  }
+  renderCollection();
 }
 
 /* =========================================================
@@ -1834,7 +2095,7 @@ function toggleArea(id) {
 function toggleLine(l) {
   const i = settings.lines.indexOf(l);
   if (i >= 0) settings.lines.splice(i,1); else settings.lines.push(l);
-  renderSettings(); updateSummary();
+  renderSettings(); updateSummary(); renderCollection();
 }
 function toggleCompany(co) {
   const coLines = Object.keys(LINES).filter(l=>LINES[l].co===co);
@@ -1936,7 +2197,7 @@ function clearHistory(){
   if (confirm("今日の記録と合計金額をすべて消しますか?")) {
     history = []; totals = blankTotals();
     store.history = history; store.totals = totals; saveStore();
-    renderHistory(); updateHeader();
+    renderHistory(); renderCollection(); updateHeader();
   }
 }
 function changePin(){
