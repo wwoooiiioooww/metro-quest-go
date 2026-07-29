@@ -1039,7 +1039,8 @@ console.log('\n[29] 操作系');
 {
   const { w, errors } = boot();
   w.eval('hideSplash()'); w.eval('closeNotice()');
-  ok(/マスコン/.test(w.document.getElementById('start-btn').textContent), '発車はマスコンになっている');
+  ok(/はっしゃ/.test(w.document.getElementById('start-btn').textContent), '発車ボタンは平易な言葉になっている');
+  ok(!/マスコン/.test(html), 'なじみのない「マスコン」を使っていない');
   ok(w.document.getElementById('horn-btn'), '警笛がある');
   ok(w.document.getElementById('door-btn'), 'ドアがある');
 
@@ -1058,6 +1059,85 @@ console.log('\n[29] 操作系');
   eq(w.document.getElementById('door-btn').disabled, false, '停車したら開けられる');
   w.eval('pressDoor()');
   ok(w.document.getElementById('bonus-msg').innerHTML.includes('ドアがひらきます'), 'ドアの案内が出る');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+
+/* ---------- 30. 発車ボタンの状態 ---------- */
+console.log('\n[30] 発車ボタン');
+{
+  const { w, alerts, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  const sb = w.document.getElementById('start-btn');
+  eq(sb.disabled, false, '回数が残っていれば押せる');
+  ok(/はっしゃ/.test(sb.textContent), '「はっしゃ」と出ている');
+
+  /* 走行中は押せない */
+  w.eval('startAll()');
+  eq(sb.disabled, true, '走行中は押せない');
+  for (let i = 0; i < 4; i++) w.eval('pullBrake()');
+  eq(sb.disabled, false, '停車したらまた押せる');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 回数を使い切った状態で開くと、ボタンは普通の見た目のまま無反応だった */
+  const st = { settings:null, spinsLeft:0, excluded:[], history:[], totalMoney:0, pin:null, noticeSeen:true };
+  const { w, alerts, errors } = boot({ mqgo_v1: JSON.stringify(st) });
+  const sb = w.document.getElementById('start-btn');
+  eq(w.eval('spinsLeft'), 0, '回数ゼロの状態で起動');
+  eq(sb.disabled, true, '回数ゼロなら最初から押せない状態になっている');
+  ok(/おわり/.test(sb.textContent), `理由がボタンに出ている (${sb.textContent})`);
+
+  /* それでも呼ばれたときに黙って終わらない */
+  w.eval('startAll()');
+  ok(alerts.some(a => a.includes('リセット')), '押しても無反応ではなく、直し方を伝える');
+  eq(w.eval('runningCount()'), 0, '回数ゼロでは発車しない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 31. 操作系の配置 ---------- */
+console.log('\n[31] 操作系の配置');
+{
+  const { w } = boot();
+  const d = w.document;
+  const mc = d.getElementById('main-controls');
+  ok(mc, '発車とブレーキをまとめる行がある');
+  ok(mc.contains(d.getElementById('start-btn')), '発車が同じ行にある');
+  ok(mc.contains(d.getElementById('brake-btn')), 'ブレーキが同じ行にある');
+  eq(mc.querySelectorAll('button').length, 2, '主操作は2つだけ');
+  ok(/#main-controls button \{[^}]*flex:1/.test(html), '2つが同じ幅で並ぶ');
+  ok(/#main-controls button \{[^}]*height:62px/.test(html), '2つが同じ高さ');
+
+  const sw = d.getElementById('switches');
+  ok(sw, '警笛とドアは別のまとまりにある');
+  ok(sw.contains(d.getElementById('horn-btn')), '警笛はスイッチ側');
+  ok(sw.contains(d.getElementById('door-btn')), 'ドアはスイッチ側');
+  ok(!mc.contains(d.getElementById('horn-btn')), '警笛が主操作に混ざっていない');
+  ok(d.querySelector('.console-top').contains(sw), 'スイッチは計器のとなりに置かれている');
+  ok(!/id="sub-controls"/.test(html), '旧レイアウトが残っていない');
+  w.close();
+}
+
+/* ---------- 32. タブから戻っても車窓が消えない ---------- */
+console.log('\n[32] タブ復帰');
+{
+  const { w, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  /* タブが非表示のあいだ getBoundingClientRect は0を返す。
+     そのまま反映するとcanvasの中身が消えるので、前の大きさを保つ */
+  w.eval('CAB.w = 320; CAB.h = 200;');
+  w.eval('cabResize()');
+  eq(w.eval('CAB.w'), 320, '0サイズのときは前の幅を保つ');
+  eq(w.eval('CAB.h'), 200, '0サイズのときは前の高さを保つ');
+
+  w.prompt = () => '1234';
+  w.eval('switchTab("set")');
+  eq(w.eval('CAB.raf'), 0, '他のタブでは描画を止める(電池対策)');
+  w.eval('switchTab("play")');
+  eq(w.eval('CAB.w'), 320, 'あそぶタブに戻っても大きさが潰れない');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }

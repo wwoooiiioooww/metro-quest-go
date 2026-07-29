@@ -222,16 +222,14 @@
   .lc { font-size:0.55em; padding:1px 5px; border-radius:8px; color:#fff; font-weight:bold; text-shadow:none; }
   /* 個々のブレーキは隠し、下の大きな1本に集約する（idはテストのため残す） */
   .stop-btn { display:none; }
-  /* 大きなブレーキレバー */
+  /* ブレーキ */
   #brake-btn {
-    display:flex; align-items:center; justify-content:center; gap:10px;
-    width:90%; max-width:350px; margin:10px auto 0; padding:12px 0 14px; cursor:pointer;
     background:linear-gradient(180deg,#3d4e69,#22304a); color:#fff;
-    border:2px solid #55688a; border-radius:14px; font-size:1.05em; font-weight:bold;
-    box-shadow:0 5px #16203a; transition:transform .12s, box-shadow .12s;
+    border:2px solid #55688a; font-size:0.82em; box-shadow:0 5px #16203a;
   }
+  #brake-btn #brake-label { white-space:pre-line; line-height:1.2; text-align:center; }
   #brake-btn .knob {
-    width:26px; height:26px; border-radius:50%;
+    width:22px; height:22px; border-radius:50%;
     background:radial-gradient(circle at 35% 30%, #ff8a80, var(--red));
     box-shadow:0 2px 5px #000; transition:transform .12s;
   }
@@ -240,32 +238,30 @@
   #brake-btn:disabled { background:#2a3244; border-color:#3a4358; color:#6b7590; box-shadow:0 5px #1a2030; }
   #brake-btn:disabled .knob { background:#4a5468; box-shadow:none; }
 
-  /* マスコン（主幹制御器）。手前に倒して発車 */
-  #start-btn {
-    display:flex; align-items:center; justify-content:center; gap:10px;
-    background:linear-gradient(180deg,#f7d117,var(--gold)); color:#111; border:none; border-radius:14px;
-    padding:12px 20px 14px; font-size:1.12em; font-weight:bold; margin-top:9px;
-    cursor:pointer; box-shadow:0 5px var(--orange); width:90%; max-width:350px;
-    transition:transform .12s, box-shadow .12s;
+  /* 発車とブレーキ。左右に同じ大きさで並べる */
+  #main-controls { display:flex; gap:10px; width:92%; max-width:360px; margin:10px auto 0; }
+  #main-controls button {
+    flex:1; min-width:0; height:62px; cursor:pointer; border-radius:14px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    font-weight:bold; transition:transform .12s, box-shadow .12s;
   }
-  #start-btn .handle {
-    width:26px; height:26px; border-radius:6px; background:linear-gradient(180deg,#5a4a10,#2e2607);
-    box-shadow:0 2px 4px rgba(0,0,0,.5);
+  #start-btn {
+    background:linear-gradient(180deg,#f7d117,var(--gold)); color:#111;
+    border:none; font-size:1.02em; box-shadow:0 5px var(--orange);
   }
   #start-btn:active { transform:translateY(5px); box-shadow:0 0 var(--orange); }
-  #start-btn:disabled { background:#7f8c8d; box-shadow:0 5px #555; color:#ddd; }
+  #start-btn:disabled { background:#6d757b; box-shadow:0 5px #4a5054; color:#e2e6e8; }
   #clear-btn { margin-top:9px; padding:11px 20px; }
-  /* 警笛とドア（抽選には一切関与しない、おまけの操作） */
-  #sub-controls { display:flex; gap:10px; justify-content:center; margin-top:9px; }
-  #sub-controls button {
-    flex:0 0 auto; min-width:104px; padding:9px 12px; cursor:pointer;
+  /* 計器のとなりの小さなスイッチ。抽選には一切関与しない */
+  #switches { display:flex; flex-direction:column; gap:5px; flex-shrink:0; }
+  #switches button {
+    width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:0.95em; padding:0;
     background:linear-gradient(180deg,#3d4e69,#22304a); color:#fff;
-    border:2px solid #55688a; border-radius:12px; font-size:0.8em; font-weight:bold;
-    box-shadow:0 4px #16203a; transition:transform .1s, box-shadow .1s;
+    border:2px solid #55688a; box-shadow:0 3px #16203a; transition:transform .1s, box-shadow .1s;
   }
-  #sub-controls button:active { transform:translateY(4px); box-shadow:0 0 #16203a; }
-  #horn-btn { background:linear-gradient(180deg,#7a4a2a,#4a2c18) !important; border-color:#9a6a44 !important; }
-  #sub-controls button:disabled { background:#2a3244 !important; border-color:#3a4358 !important; color:#6b7590; box-shadow:0 4px #1a2030; }
+  #switches button:active { transform:translateY(3px); box-shadow:0 0 #16203a; }
+  #horn-btn { background:linear-gradient(180deg,#8a5230,#4a2c18) !important; border-color:#a8734c !important; }
+  #switches button:disabled { background:#2a3244 !important; border-color:#3a4358 !important; opacity:.5; box-shadow:0 3px #1a2030; }
   #start-btn:active { transform:translateY(5px); box-shadow:0 0 var(--orange); }
   #start-btn:disabled { background-color:#7f8c8d; box-shadow:0 5px #555; color:#ccc; }
   #clear-btn {
@@ -462,6 +458,10 @@
         <span class="dest-label">つぎは</span>
         <span id="dest-text">＿＿＿＿</span>
       </div>
+      <div id="switches">
+        <button id="horn-btn" onclick="pressHorn()" title="けいてき">🔔</button>
+        <button id="door-btn" onclick="pressDoor()" disabled title="ドアかいへい">🚪</button>
+      </div>
       <div id="speedo">
         <div class="needle"></div>
         <div id="speedo-num">0</div>
@@ -493,11 +493,9 @@
     </div>
   </div>
 
-  <button id="brake-btn" onclick="pullBrake()" disabled><span class="knob"></span><span id="brake-label">ブレーキ</span></button>
-  <button id="start-btn" onclick="startAll()"><span class="handle"></span>マスコン（発車）</button>
-  <div id="sub-controls">
-    <button id="horn-btn" onclick="pressHorn()">🔔 けいてき</button>
-    <button id="door-btn" onclick="pressDoor()" disabled>🚪 ドアかいへい</button>
+  <div id="main-controls">
+    <button id="start-btn" onclick="startAll()">🚃 はっしゃ</button>
+    <button id="brake-btn" onclick="pullBrake()" disabled><span class="knob"></span><span id="brake-label">ブレーキ</span></button>
   </div>
   <button id="clear-btn" onclick="clearMission()">⭐ ミッション達成!スタンプGET</button>
   <div id="bonus-msg"></div>
@@ -841,7 +839,7 @@ function rewardValue(label) {
      同一オリジンに家族版の旧キーが残っている可能性があり、
      拾うと他アプリのデータを取り込んでしまうため。
    ========================================================= */
-const APP_VER = 'v9';
+const APP_VER = 'v10';
 const APP_KEY = 'mqgo_v1';
 
 /* totalMoney: ごほうびの累計。stampモードでは「こ」、moneyモードでは「円」。
@@ -990,6 +988,9 @@ const Z_FAR  = 620;
 function cabResize() {
   const cv = CAB.cv; if (!cv) return;
   const r = cv.getBoundingClientRect();
+  /* タブが非表示のあいだは大きさが0になる。そのまま反映すると
+     canvasの中身が消えてしまうので、前の大きさを保つ */
+  if (r.width < 2 || r.height < 2) return;
   CAB.dpr = Math.min(window.devicePixelRatio || 1, 2);
   CAB.w = Math.max(1, Math.round(r.width));
   CAB.h = Math.max(1, Math.round(r.height));
@@ -1169,7 +1170,7 @@ function updateReelFocus() {
   const door = document.getElementById('door-btn');
   if (door) door.disabled = anyRunning || !currentResult.station;
   if (label) label.textContent = anyRunning
-    ? `ブレーキ（${REEL_NAMES[activeReel]}）`
+    ? `ブレーキ\n${REEL_NAMES[activeReel]}`
     : 'ブレーキ';
 }
 
@@ -1317,7 +1318,13 @@ function getFairMission() {
 }
 
 function startAll() {
-  if (spinsLeft <= 0) return;
+  /* 回数を使い切った状態で開くと、ボタンは普通の見た目のまま何も起きなかった。
+     黙って return せず、理由と直し方を伝える */
+  if (spinsLeft <= 0) {
+    alert("きょうのぶんは おわりです。\n⚙️せってい →「残り回数をリセット」でまた のれます。");
+    updateStartBtn();
+    return;
+  }
   const avail = getCandidates();
   if (avail.length === 0) { alert("候補の駅が0駅です!⚙️設定でエリアや路線を見直してね。"); return; }
   spinsLeft--;
@@ -1348,7 +1355,7 @@ function startAll() {
     }, 50);
   }
   updateReelFocus();
-  if (spinsLeft === 0) document.getElementById('start-btn').innerText = "回数ゼロ!(パパにお願い?)";
+  updateStartBtn();
 }
 
 function stopReel(index) {
@@ -1384,6 +1391,7 @@ function stopReel(index) {
 
 function checkAllStopped() {
   if (!isRunning.includes(true)) {
+    updateStartBtn();
     /* 到着。0.8秒かけて停車し、駅名標がせり上がる */
     setCab('arriving');
     arriveSound();
@@ -1470,6 +1478,16 @@ function todayStats() {
     days  : new Set(history.filter(h => h.date).map(h => h.date)).size
   };
 }
+/* 発車ボタンの見た目と可否を1か所で決める。
+   走行中は押せない／回数が尽きたら「おわり」と明示する */
+function updateStartBtn() {
+  const sb = document.getElementById('start-btn');
+  if (!sb) return;
+  const out = spinsLeft <= 0;
+  sb.disabled = out || runningCount() > 0;
+  sb.textContent = out ? '🚉 きょうのぶんは おわり' : '🚃 はっしゃ';
+}
+
 function updateHeader() {
   const rw = rewardDef(), st = todayStats();
   document.getElementById('spins-left').innerText = `残り回数:${spinsLeft}回`;
@@ -1480,6 +1498,7 @@ function updateHeader() {
     `${getRank(history.length)}　<span class="sub">クリア${history.length}回${days}</span>` +
     ` <span class="help" onclick="openRanks()">❓称号一覧</span>`;
   document.getElementById('reel-label-2').innerText = rw.reelLabel;
+  updateStartBtn();
   updateSummary();
 }
 function updateSummary() {
@@ -1569,6 +1588,15 @@ function switchTab(name) {
   });
   if (name === 'set') renderSettings();
   if (name === 'log') { renderHistory(); renderExcluded(); }
+  /* あそぶタブに戻ったら、大きさを測り直して描き直す。
+     他のタブにいるあいだは描画を止めておく（電池対策） */
+  if (name === 'play') {
+    cabResize();
+    drawCab(0);
+    if (cabState !== 'stopped' && motionOn()) cabStart();
+  } else {
+    cabStop();
+  }
   window.scrollTo({ top:0 });
 }
 function openSettings() { switchTab('set'); }
