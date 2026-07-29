@@ -39,6 +39,8 @@ function boot(ls, src) {
       window.confirm = () => true;
       window.alert = m => alerts.push(String(m));
       window.scrollTo = () => {}; // jsdom未実装。本物のエラーを埋もれさせないため潰す
+      // jsdomはcanvasに未対応。null を返させて「描画できない環境」を再現する
+      window.HTMLCanvasElement.prototype.getContext = () => null;
       window.addEventListener('error', e => errors.push(e.message));
       if (ls) Object.entries(ls).forEach(([k, v]) => window.localStorage.setItem(k, v));
     },
@@ -831,12 +833,13 @@ console.log('\n[23] 景色');
   ok(scenes.some(s => s.cls === 'sc-rain'), '雨がある');
   ok(scenes.some(s => s.cls === 'sc-under'), '地下がある');
 
-  /* 景色ごとに壁・天井・床の色が定義されていること（暗くて見えない問題の再発防止） */
+  /* 景色ごとに描画色がそろっていること（暗くて見えない問題の再発防止） */
   for (const s of scenes) {
-    ok(new RegExp('\\.' + s.cls + ' \\.tunnel').test(html),  s.tag + ' の壁の色がある');
-    ok(new RegExp('\\.' + s.cls + ' \\.ceiling').test(html), s.tag + ' の天井の色がある');
-    ok(new RegExp('\\.' + s.cls + ' \\.floor').test(html),   s.tag + ' の床の色がある');
-    ok(new RegExp('#cab-view\\.' + s.cls + ' \\{').test(html), s.tag + ' の背景色がある');
+    ok(Array.isArray(s.sky) && s.sky.length === 2, s.tag + ' の空の色が2色ある');
+    ok(/^#[0-9a-f]{6}$/i.test(s.ground), s.tag + ' の地面の色がある');
+    ok(/^#[0-9a-f]{6}$/i.test(s.rail),   s.tag + ' の線路の色がある');
+    ok(Array.isArray(s.kinds) && s.kinds.length > 0, s.tag + ' に通り過ぎるものが定義されている');
+    ok(new RegExp('#cab-view\\.' + s.cls + ' \\{').test(html), s.tag + ' の背景色がCSS側にもある(canvas非対応時の保険)');
   }
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
@@ -975,6 +978,88 @@ console.log('\n[27] 画面構造');
 {
   /* 確定が進んでもブレーキの位置が動かないよう、表示器の高さを固定してある */
   ok(/\.slot-container \{[^}]*min-height/.test(html), '表示器の領域に高さが確保されている');
+}
+
+
+/* ---------- 28. 車窓（canvas / 一点透視） ---------- */
+console.log('\n[28] 車窓の描画');
+{
+  const { w, errors } = boot();
+  const cv = w.document.getElementById('cab-canvas');
+  ok(cv, 'canvasがある');
+  eq(cv.tagName, 'CANVAS', 'canvas要素である');
+  ok(w.document.getElementById('cab-view').contains(cv), '車窓の中に置かれている');
+
+  /* 投影の計算。奥にあるほど中心に寄り、小さくなる（一点透視そのもの） */
+  const near = w.eval('projX(100, 260, 0)');
+  const far  = w.eval('projX(100, 520, 0)');
+  eq(near, 100, '距離260なら x=100 はそのまま100');
+  eq(far, 50, '距離が2倍になると画面上の位置は半分（＝中心に寄る）');
+  ok(Math.abs(far) < Math.abs(near), '奥のものほど消失点に近づく');
+  const h1 = w.eval('260/260'), h2 = w.eval('260/520');
+  ok(h2 < h1, '奥のものほど小さく描かれる');
+
+  /* 物体が奥行き方向にばらまかれている */
+  w.eval('cabSeed()');
+  const objs = w.eval('CAB.objs');
+  ok(objs.length > 10, `通り過ぎるものが生成される (${objs.length}個)`);
+  const zs = objs.map(o => o.z);
+  ok(Math.max(...zs) - Math.min(...zs) > 200, '奥行きにばらけている（同じ位置に固まらない）');
+  ok(objs.every(o => o.side === 1 || o.side === -1), '線路の左右に振り分けられている');
+  ok(objs.every(o => w.eval('curScene.kinds').includes(o.kind)), '景色に合ったものだけが出る');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* canvasが使えない環境でも、アプリが壊れないこと（この環境がまさにそれ） */
+  const { w, errors } = boot();
+  eq(w.eval('CAB.ctx'), null, '2dコンテキストが取れない環境を再現している');
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.eval('drawCab(0.016)');
+  w.eval('startAll()');
+  for (let i = 0; i < 4; i++) w.eval('pullBrake()');
+  eq(w.eval('runningCount()'), 0, '描画できなくても発車から停車まで通る');
+  ok(w.eval('currentResult.station').length > 0, '描画できなくても行き先は決まる');
+  w.eval('clearMission()');
+  eq(w.eval('history.length'), 1, '描画できなくても記録できる');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 演出OFFなら描画ループを回さない（電池対策） */
+  const { w } = boot();
+  w.eval('settings.motion = false');
+  w.eval('setCab("cruise")');
+  eq(w.eval('CAB.raf'), 0, '演出OFFでは描画ループを回さない');
+  w.close();
+}
+
+/* ---------- 29. 運転台の操作系 ---------- */
+console.log('\n[29] 操作系');
+{
+  const { w, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  ok(/マスコン/.test(w.document.getElementById('start-btn').textContent), '発車はマスコンになっている');
+  ok(w.document.getElementById('horn-btn'), '警笛がある');
+  ok(w.document.getElementById('door-btn'), 'ドアがある');
+
+  /* 警笛は抽選に一切関与しない */
+  eq(w.document.getElementById('horn-btn').disabled, false, '警笛はいつでも押せる');
+  const before = w.eval('spinsLeft');
+  w.eval('pressHorn()'); w.eval('pressHorn()');
+  eq(w.eval('spinsLeft'), before, '警笛を押しても回数が減らない');
+  eq(w.eval('runningCount()'), 0, '警笛を押しても抽選は始まらない');
+
+  /* ドアは停車かつ行き先が決まってから */
+  eq(w.document.getElementById('door-btn').disabled, true, '行き先が決まる前は開けられない');
+  w.eval('startAll()');
+  eq(w.document.getElementById('door-btn').disabled, true, '走行中は開けられない');
+  for (let i = 0; i < 4; i++) w.eval('pullBrake()');
+  eq(w.document.getElementById('door-btn').disabled, false, '停車したら開けられる');
+  w.eval('pressDoor()');
+  ok(w.document.getElementById('bonus-msg').innerHTML.includes('ドアがひらきます'), 'ドアの案内が出る');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
 }
 
 /* ---------- 結果 ---------- */

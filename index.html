@@ -125,72 +125,19 @@
 
   /* ---- 🚇 ちかてつ ---- */
   #cab-view.sc-under { background:linear-gradient(#0b1224, #05070f); }
-  .sc-under .tunnel { background-image:repeating-linear-gradient(
-      to bottom, #263b66 0 5px, #16223d 5px 17px, #101a30 17px 34px); }
-  .sc-under .ceiling { background-image:repeating-linear-gradient(
-      to bottom, rgba(255,244,214,.92) 0 5px, transparent 5px 42px); }
-  .sc-under .floor { background-image:repeating-linear-gradient(
-      to bottom, #2b3c63 0 4px, transparent 4px 26px); }
 
   /* ---- ☀️ はれ ---- */
   #cab-view.sc-sky { background:linear-gradient(#5fb6ef 0%, #a9dcff 55%, #d9f0ff 100%); }
-  .sc-sky .tunnel { background-image:repeating-linear-gradient(
-      to bottom, #4e9c46 0 10px, #3f8339 10px 24px, #35702f 24px 40px); }
-  .sc-sky .ceiling { background-image:repeating-linear-gradient(
-      to bottom, rgba(255,255,255,.95) 0 9px, transparent 9px 58px); }
-  .sc-sky .floor { background-image:repeating-linear-gradient(
-      to bottom, #b9b0a2 0 5px, #8d8577 5px 12px, transparent 12px 30px); }
 
   /* ---- ☔ あめ ---- */
   #cab-view.sc-rain { background:linear-gradient(#5d6b7d 0%, #8e9cad 60%, #b3bec9 100%); }
-  .sc-rain .tunnel { background-image:repeating-linear-gradient(
-      to bottom, #3f5245 0 9px, #33443a 9px 22px, #2a3830 22px 38px); }
-  .sc-rain .ceiling { background-image:repeating-linear-gradient(
-      to bottom, rgba(230,238,246,.7) 0 7px, transparent 7px 52px); }
-  .sc-rain .floor { background-image:repeating-linear-gradient(
-      to bottom, #7d8791 0 5px, #626c76 5px 12px, transparent 12px 30px); }
 
   /* ---- 🌆 ゆうやけ ---- */
   #cab-view.sc-dusk { background:linear-gradient(#ff9950 0%, #f2685f 45%, #6d4a9c 100%); }
-  .sc-dusk .tunnel {
-    background-image:
-      radial-gradient(circle at 30% 20%, rgba(255,235,160,.95) 1.5px, transparent 2px),
-      repeating-linear-gradient(to bottom, #2b2440 0 16px, #241d36 16px 34px);
-    background-size:14px 20px, auto;
-  }
-  .sc-dusk .ceiling { background-image:repeating-linear-gradient(
-      to bottom, rgba(255,214,150,.85) 0 6px, transparent 6px 56px); }
-  .sc-dusk .floor { background-image:repeating-linear-gradient(
-      to bottom, #574a63 0 5px, #423a52 5px 12px, transparent 12px 30px); }
-  .tunnel-wrap { position:absolute; inset:0; transform-style:preserve-3d; }
-  /* 左右の壁を奥へ寝かせる。縞を流して「進んでいる」ことを表す */
-  .tunnel {
-    position:absolute; top:-20%; bottom:-20%; width:52%;
-    animation:rush var(--spd) linear infinite;
-  }
-  .tunnel.left  { left:0;  transform:rotateY(52deg);  transform-origin:left center; }
-  .tunnel.right { right:0; transform:rotateY(-52deg); transform-origin:right center; }
-  /* 天井の照明。壁より速く流して視差を出す */
-  .ceiling {
-    position:absolute; top:0; left:0; right:0; height:36%;
-    transform:rotateX(58deg); transform-origin:top center;
-    animation:rush calc(var(--spd) * 0.55) linear infinite;
-  }
-  .floor {
-    position:absolute; bottom:0; left:0; right:0; height:30%;
-    transform:rotateX(-58deg); transform-origin:bottom center;
-    animation:rush calc(var(--spd) * 0.8) linear infinite;
-  }
-  @keyframes rush { to { background-position-y:120px; } }
+  /* 車窓の本体。一点透視の描画はJS側(drawCab)が行う */
+  #cab-canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
   /* 奥の光点（トンネルの出口）。減速すると大きくなる */
-  #cab-view::after {
-    content:""; position:absolute; left:50%; top:48%; transform:translate(-50%,-50%);
-    width:54px; height:38px; border-radius:50%; z-index:1;
-    background:radial-gradient(ellipse, rgba(255,255,255,.75), transparent 70%);
-    transition:width .6s, height .6s, opacity .6s;
-  }
-  #cab-view.arriving::after { width:150px; height:110px; }
-  #cab-view.stopped::after { opacity:.25; }
+
   /* 到着時にせり上がる駅名標 */
   #station-sign {
     position:absolute; left:50%; bottom:14px; transform:translate(-50%, 60px);
@@ -293,12 +240,32 @@
   #brake-btn:disabled { background:#2a3244; border-color:#3a4358; color:#6b7590; box-shadow:0 5px #1a2030; }
   #brake-btn:disabled .knob { background:#4a5468; box-shadow:none; }
 
+  /* マスコン（主幹制御器）。手前に倒して発車 */
   #start-btn {
-    background:linear-gradient(180deg,#f7d117,var(--gold)); color:#111; border:none; border-radius:50px;
-    padding:12px 30px; font-size:1.2em; font-weight:bold; margin-top:9px;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    background:linear-gradient(180deg,#f7d117,var(--gold)); color:#111; border:none; border-radius:14px;
+    padding:12px 20px 14px; font-size:1.12em; font-weight:bold; margin-top:9px;
     cursor:pointer; box-shadow:0 5px var(--orange); width:90%; max-width:350px;
+    transition:transform .12s, box-shadow .12s;
   }
+  #start-btn .handle {
+    width:26px; height:26px; border-radius:6px; background:linear-gradient(180deg,#5a4a10,#2e2607);
+    box-shadow:0 2px 4px rgba(0,0,0,.5);
+  }
+  #start-btn:active { transform:translateY(5px); box-shadow:0 0 var(--orange); }
+  #start-btn:disabled { background:#7f8c8d; box-shadow:0 5px #555; color:#ddd; }
   #clear-btn { margin-top:9px; padding:11px 20px; }
+  /* 警笛とドア（抽選には一切関与しない、おまけの操作） */
+  #sub-controls { display:flex; gap:10px; justify-content:center; margin-top:9px; }
+  #sub-controls button {
+    flex:0 0 auto; min-width:104px; padding:9px 12px; cursor:pointer;
+    background:linear-gradient(180deg,#3d4e69,#22304a); color:#fff;
+    border:2px solid #55688a; border-radius:12px; font-size:0.8em; font-weight:bold;
+    box-shadow:0 4px #16203a; transition:transform .1s, box-shadow .1s;
+  }
+  #sub-controls button:active { transform:translateY(4px); box-shadow:0 0 #16203a; }
+  #horn-btn { background:linear-gradient(180deg,#7a4a2a,#4a2c18) !important; border-color:#9a6a44 !important; }
+  #sub-controls button:disabled { background:#2a3244 !important; border-color:#3a4358 !important; color:#6b7590; box-shadow:0 4px #1a2030; }
   #start-btn:active { transform:translateY(5px); box-shadow:0 0 var(--orange); }
   #start-btn:disabled { background-color:#7f8c8d; box-shadow:0 5px #555; color:#ccc; }
   #clear-btn {
@@ -481,12 +448,7 @@
 
   <!-- 前面展望。壁と照明が奥から手前へ流れる -->
   <div id="cab-view" class="stopped">
-    <div class="tunnel-wrap">
-      <div class="tunnel left"></div>
-      <div class="tunnel right"></div>
-      <div class="ceiling"></div>
-      <div class="floor"></div>
-    </div>
+    <canvas id="cab-canvas"></canvas>
     <div class="rain"></div>
     <div id="jizo">🗿</div>
     <div id="scene-tag">🚇 ちかてつ</div>
@@ -532,7 +494,11 @@
   </div>
 
   <button id="brake-btn" onclick="pullBrake()" disabled><span class="knob"></span><span id="brake-label">ブレーキ</span></button>
-  <button id="start-btn" onclick="startAll()">🚃 発車</button>
+  <button id="start-btn" onclick="startAll()"><span class="handle"></span>マスコン（発車）</button>
+  <div id="sub-controls">
+    <button id="horn-btn" onclick="pressHorn()">🔔 けいてき</button>
+    <button id="door-btn" onclick="pressDoor()" disabled>🚪 ドアかいへい</button>
+  </div>
   <button id="clear-btn" onclick="clearMission()">⭐ ミッション達成!スタンプGET</button>
   <div id="bonus-msg"></div>
 
@@ -875,7 +841,7 @@ function rewardValue(label) {
      同一オリジンに家族版の旧キーが残っている可能性があり、
      拾うと他アプリのデータを取り込んでしまうため。
    ========================================================= */
-const APP_VER = 'v8';
+const APP_VER = 'v9';
 const APP_KEY = 'mqgo_v1';
 
 /* totalMoney: ごほうびの累計。stampモードでは「こ」、moneyモードでは「円」。
@@ -950,17 +916,28 @@ let cabState = 'stopped';
 let activeReel = 0;   /* いま確定させようとしている表示器 */
 
 /* 景色。地下だけだと暗くて見えないので、乗るたびに変わるようにした */
+/* canvasで描くための色。sky=空のグラデ / ground=地面 / rail=線路
+   kinds=脇を通り過ぎるもの(pole 電柱 / tree 木 / bldg ビル / lamp 天井灯) */
 const SCENES = [
-  { cls:'sc-under', tag:'🚇 ちかてつ' },
-  { cls:'sc-sky',   tag:'☀️ はれ' },
-  { cls:'sc-rain',  tag:'☔ あめ' },
-  { cls:'sc-dusk',  tag:'🌆 ゆうやけ' }
+  { cls:'sc-under', tag:'🚇 ちかてつ',
+    sky:['#0d1730','#060a16'], ground:'#151d33', rail:'#4a5a7e',
+    body:'#33456e', accent:'#ffe9b0', kinds:['lamp','pole'] },
+  { cls:'sc-sky', tag:'☀️ はれ',
+    sky:['#59b2ee','#cfeaff'], ground:'#6fa855', rail:'#9a8f7d',
+    body:'#3f8339', accent:'#d8d2c4', kinds:['tree','pole','bldg'] },
+  { cls:'sc-rain', tag:'☔ あめ',
+    sky:['#5d6b7d','#aab5c1'], ground:'#5d7355', rail:'#77808a',
+    body:'#33443a', accent:'#b9c3cd', kinds:['tree','pole'] },
+  { cls:'sc-dusk', tag:'🌆 ゆうやけ',
+    sky:['#ff9950','#6d4a9c'], ground:'#3c3450', rail:'#6b6076',
+    body:'#241d36', accent:'#ffd98a', kinds:['bldg','pole'] }
 ];
 let curScene = SCENES[0];
 function pickScene() {
   curScene = SCENES[Math.floor(Math.random() * SCENES.length)];
   const tag = document.getElementById('scene-tag');
   if (tag) tag.textContent = curScene.tag;
+  if (CAB.ctx) { cabSeed(); drawCab(0); }
 }
 
 /* 演出を出してよいか。OSの「視差効果を減らす」設定があれば設定より優先して止める */
@@ -993,6 +970,169 @@ function setCab(state) {
   else if (state === 'cruise')   { setCabSpeed(78); startRunSound(); }
   else if (state === 'braking')  { setCabSpeed(Math.max(16, 20 * runningCount())); startRunSound(); }
   else if (state === 'arriving') { setCabSpeed(12); stopRunSound(); }
+  /* 描画ループは停車以外で回す */
+  if (state === 'stopped') cabStop();
+  else if (motionOn()) cabStart();
+}
+
+/* =========================================================
+   車窓の描画（一点透視）
+   物体に z(奥行き) を持たせ、毎フレーム z を減らす。
+   画面上の位置 = 中心 + x/z * 焦点距離、大きさ = 焦点距離 / z。
+   これだけで「奥から手前へ流れてくる」絵になる。
+   ※画像素材は使わず、すべて図形で描く
+   ========================================================= */
+const CAB = { cv:null, ctx:null, w:0, h:0, dpr:1, objs:[], raf:0, last:0, dist:0 };
+const FOCAL = 260;      /* 焦点距離。大きいほど望遠 */
+const Z_NEAR = 12;      /* これより手前に来たら奥へ戻す */
+const Z_FAR  = 620;
+
+function cabResize() {
+  const cv = CAB.cv; if (!cv) return;
+  const r = cv.getBoundingClientRect();
+  CAB.dpr = Math.min(window.devicePixelRatio || 1, 2);
+  CAB.w = Math.max(1, Math.round(r.width));
+  CAB.h = Math.max(1, Math.round(r.height));
+  cv.width  = CAB.w * CAB.dpr;
+  cv.height = CAB.h * CAB.dpr;
+  if (CAB.ctx) CAB.ctx.setTransform(CAB.dpr, 0, 0, CAB.dpr, 0, 0);
+}
+
+/* 脇を通り過ぎるものを z 方向にばらまく */
+function cabSeed() {
+  const kinds = curScene.kinds;
+  CAB.objs = [];
+  for (let i = 0; i < 26; i++) {
+    const side = i % 2 ? 1 : -1;
+    CAB.objs.push({
+      kind: kinds[Math.floor(Math.random() * kinds.length)],
+      side,
+      x: side * (70 + Math.random() * 90),
+      z: Z_NEAR + (i / 26) * (Z_FAR - Z_NEAR) + Math.random() * 18,
+      hh: 60 + Math.random() * 90,      /* 高さ */
+      ww: 22 + Math.random() * 30       /* 幅 */
+    });
+  }
+}
+
+function cabInit() {
+  CAB.cv = document.getElementById('cab-canvas');
+  if (!CAB.cv || !CAB.cv.getContext) return;
+  try { CAB.ctx = CAB.cv.getContext('2d'); } catch(e) { CAB.ctx = null; }
+  if (!CAB.ctx) return;                 /* 非対応環境ではCSSの背景色だけになる */
+  cabResize();
+  cabSeed();
+  window.addEventListener('resize', () => { cabResize(); drawCab(0); });
+  drawCab(0);
+}
+
+function projY(y, z, horizon) { return horizon + (y * FOCAL) / z; }
+function projX(x, z, cx)      { return cx + (x * FOCAL) / z; }
+
+function drawCab(dt) {
+  const c = CAB.ctx; if (!c) return;
+  const W = CAB.w, H = CAB.h, cx = W / 2, horizon = H * 0.54;
+  const sc = curScene;
+
+  /* 速度。--kmh をそのまま奥行きの進み具合に使う */
+  const kmh = parseFloat(document.documentElement.style.getPropertyValue('--kmh')) || 0;
+  const speed = motionOn() ? kmh * 1.15 : 0;
+  CAB.dist += speed * dt;
+
+  /* 空 */
+  const g = c.createLinearGradient(0, 0, 0, horizon);
+  g.addColorStop(0, sc.sky[0]); g.addColorStop(1, sc.sky[1]);
+  c.fillStyle = g; c.fillRect(0, 0, W, horizon + 1);
+  /* 地面 */
+  c.fillStyle = sc.ground; c.fillRect(0, horizon, W, H - horizon);
+  /* 消失点の光 */
+  const glow = c.createRadialGradient(cx, horizon, 0, cx, horizon, W * 0.22);
+  glow.addColorStop(0, 'rgba(255,255,255,.55)');
+  glow.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = glow; c.fillRect(0, horizon - W * 0.22, W, W * 0.44);
+
+  /* 線路（消失点へ収束する2本）と枕木 */
+  c.strokeStyle = sc.rail; c.lineWidth = 2;
+  for (const s of [-1, 1]) {
+    c.beginPath();
+    c.moveTo(projX(s * 26, Z_NEAR, cx), projY(30, Z_NEAR, horizon));
+    c.lineTo(cx, horizon);
+    c.stroke();
+  }
+  c.strokeStyle = sc.rail;
+  for (let i = 0; i < 26; i++) {
+    const z = Z_NEAR + ((i * 26 + CAB.dist * 0.9) % (Z_FAR - Z_NEAR));
+    const y = projY(30, z, horizon);
+    const half = Math.abs(projX(32, z, cx) - cx);
+    c.globalAlpha = Math.max(0, 1 - z / Z_FAR);
+    c.lineWidth = Math.max(0.5, 90 / z);
+    c.beginPath(); c.moveTo(cx - half, y); c.lineTo(cx + half, y); c.stroke();
+  }
+  c.globalAlpha = 1;
+
+  /* 脇を通り過ぎるもの。奥にあるものから先に描く */
+  const objs = CAB.objs;
+  for (const o of objs) {
+    o.z -= speed * dt;
+    if (o.z < Z_NEAR) {
+      o.z += (Z_FAR - Z_NEAR);
+      o.kind = sc.kinds[Math.floor(Math.random() * sc.kinds.length)];
+      o.x = o.side * (70 + Math.random() * 90);
+      o.hh = 60 + Math.random() * 90;
+      o.ww = 22 + Math.random() * 30;
+    }
+  }
+  const sorted = objs.slice().sort((a, b) => b.z - a.z);
+  for (const o of sorted) {
+    const sx = projX(o.x, o.z, cx);
+    const base = projY(30, o.z, horizon);
+    const k = FOCAL / o.z;
+    const hh = o.hh * k, ww = Math.max(1, o.ww * k);
+    if (sx < -ww * 2 || sx > W + ww * 2) continue;
+    c.globalAlpha = Math.min(1, Math.max(0.15, 1.2 - o.z / Z_FAR));
+
+    if (o.kind === 'pole') {
+      c.fillStyle = sc.accent;
+      c.fillRect(sx - Math.max(1, ww * 0.10), base - hh, Math.max(1, ww * 0.20), hh);
+      c.fillRect(sx - ww * 0.45, base - hh, ww * 0.9, Math.max(1, hh * 0.045));
+    } else if (o.kind === 'tree') {
+      c.fillStyle = '#6b4a2a';
+      c.fillRect(sx - Math.max(1, ww * 0.09), base - hh * 0.42, Math.max(1, ww * 0.18), hh * 0.42);
+      c.fillStyle = sc.body;
+      c.beginPath(); c.arc(sx, base - hh * 0.62, Math.max(1, ww * 0.62), 0, Math.PI * 2); c.fill();
+    } else if (o.kind === 'bldg') {
+      c.fillStyle = sc.body;
+      c.fillRect(sx - ww / 2, base - hh, ww, hh);
+      c.fillStyle = sc.accent;
+      const cols = Math.max(1, Math.floor(ww / 9)), rows = Math.max(1, Math.floor(hh / 13));
+      for (let a = 0; a < cols; a++) for (let b = 0; b < rows; b++) {
+        if ((a + b) % 3) continue;
+        c.fillRect(sx - ww / 2 + 3 + a * 9, base - hh + 5 + b * 13, Math.max(1, ww * 0.10), Math.max(1, hh * 0.05));
+      }
+    } else if (o.kind === 'lamp') {
+      c.fillStyle = sc.accent;
+      c.fillRect(sx - ww * 0.5, base - hh * 1.55, ww, Math.max(1, hh * 0.05));
+    }
+  }
+  c.globalAlpha = 1;
+}
+
+function cabLoop(ts) {
+  if (!CAB.last) CAB.last = ts;
+  const dt = Math.min(0.05, (ts - CAB.last) / 1000);
+  CAB.last = ts;
+  drawCab(dt);
+  CAB.raf = requestAnimationFrame(cabLoop);
+}
+function cabStart() {
+  if (CAB.raf || !CAB.ctx) return;
+  CAB.last = 0;
+  CAB.raf = requestAnimationFrame(cabLoop);
+}
+function cabStop() {
+  if (CAB.raf) cancelAnimationFrame(CAB.raf);
+  CAB.raf = 0;
+  drawCab(0);
 }
 
 function setDest(text) {
@@ -1025,6 +1165,9 @@ function updateReelFocus() {
   const label = document.getElementById('brake-label');
   const anyRunning = runningCount() > 0;
   if (brake) brake.disabled = !anyRunning;
+  /* ドアは停車していて、かつ行き先が決まっているときだけ開けられる */
+  const door = document.getElementById('door-btn');
+  if (door) door.disabled = anyRunning || !currentResult.station;
   if (label) label.textContent = anyRunning
     ? `ブレーキ（${REEL_NAMES[activeReel]}）`
     : 'ブレーキ';
@@ -1112,6 +1255,28 @@ function stopRunSound() {
   try { if (runOsc) { runOsc.stop(); runOsc.disconnect(); } } catch(e){}
   runOsc = null;
 }
+/* 警笛。抽選には関与しない、押すと鳴るだけの操作 */
+function hornSound() {
+  beep(392, 0.42, 'sawtooth');
+  setTimeout(() => beep(523, 0.42, 'sawtooth'), 40);
+}
+function pressHorn() { unlockAudio(); hornSound(); }
+
+/* ドア開閉。到着後に押せる */
+function doorSound() {
+  [1046, 784].forEach((f,i) => setTimeout(() => beep(f, 0.2, 'sine'), i * 160));
+  setTimeout(() => beep(180, 0.5, 'sawtooth'), 380);
+}
+function pressDoor() {
+  unlockAudio(); doorSound();
+  const b = document.getElementById('bonus-msg');
+  if (b && b.style.display !== 'block') {
+    b.innerHTML = '🚪 ドアがひらきます。ごちゅういください。';
+    b.style.display = 'block';
+    setTimeout(() => { if (b.innerHTML.indexOf('ドアがひらきます') >= 0) b.style.display = 'none'; }, 2600);
+  }
+}
+
 function departSound(){ [880,1047].forEach((f,i)=>setTimeout(()=>beep(f,0.22,'triangle'),i*180)); }
 function brakeSound(){ beep(300,0.10,'square'); }
 function arriveSound(){ [784,659,523].forEach((f,i)=>setTimeout(()=>beep(f,0.18,'triangle'),i*130)); }
@@ -1633,6 +1798,7 @@ function hideSplash() {
 }
 applyMotionPref();
 pickScene();
+cabInit();
 setCab('stopped');
 updateReelFocus();
 if (motionOn()) setTimeout(hideSplash, 1200);
