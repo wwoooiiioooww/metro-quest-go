@@ -103,8 +103,9 @@
 
   /* お地蔵さん。車窓の中だけで「当たった」と分かるようにする
      （下にスクロールしないとメッセージが読めなかったため） */
+  /* 帯(z-index:8)より前に出す。主役はお地蔵さんなので最前面 */
   #jizo {
-    position:absolute; z-index:7; left:100%; top:30%; font-size:3.6em; opacity:0;
+    position:absolute; z-index:9; left:100%; top:30%; font-size:3.6em; opacity:0;
     filter:drop-shadow(0 0 18px #ffe08a);
   }
   #jizo.on { animation:jizoPass 3.6s ease-in-out forwards; }
@@ -275,6 +276,26 @@
   #start-btn:active { transform:translateY(5px); box-shadow:0 0 var(--orange); }
   #start-btn:disabled { background:#6d757b; box-shadow:0 5px #4a5054; color:#e2e6e8; }
   #clear-btn { margin-top:9px; padding:11px 20px; transition:background .2s; }
+  /* 写真は任意。撮らなくても達成できる（撮れない場面を作らないため） */
+  #photo-row { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:9px; }
+  #photo-btn {
+    background:#34597a; color:#fff; border:2px solid #4d7ea8; border-radius:10px;
+    padding:8px 14px; font-size:0.85em; font-weight:bold; cursor:pointer;
+  }
+  #photo-btn:disabled { background:#2a3244; border-color:#3a4358; color:#6b7590; }
+  #photo-preview {
+    display:none; width:46px; height:46px; object-fit:cover;
+    border-radius:8px; border:2px solid var(--cyan);
+  }
+  #photo-drop {
+    display:none; background:var(--red); color:#fff; border:none;
+    border-radius:8px; padding:6px 9px; font-size:0.8em; cursor:pointer;
+  }
+  #photo-row.has-photo #photo-preview, #photo-row.has-photo #photo-drop { display:inline-block; }
+  .history-item .hphoto {
+    width:52px; height:52px; object-fit:cover; border-radius:6px;
+    border:1px solid var(--line); float:right; margin-left:8px;
+  }
   /* 1回目のタップでこの状態になる。もう一度押すまで確定しない */
   #clear-btn.armed {
     background-color:var(--orange); box-shadow:0 4px #b9770e;
@@ -450,6 +471,14 @@
       <p class="lead">■ 免責</p>
       <p>本アプリは現状のまま提供されます。ご利用にともなって生じたいかなる損害についても、制作者は責任を負いません。</p>
 
+      <p class="lead">■ しゃしんについて</p>
+      <p>ミッション達成のときに<b>写真を撮ることができます（任意）</b>。撮らなくても達成できます。<br>
+      「📷 しゃしんをとる」を押したときだけカメラが開きます。撮った写真は<b>この端末の中だけ</b>に保存され、外部へ送られることはありません。新しい60枚を超えると、古いものから自動で消えます。</p>
+
+      <p class="lead">■ 保護者用の「あいことば」について</p>
+      <p>⚙️せってい を開くときに必要です。<b>はじめは「1234」</b>になっています。せってい内でいつでも変更できます。<br>
+      これは秘密を守るためのものではなく、<b>お子さまの誤操作を防ぐため</b>のものです。わすれた場合は、ブラウザのデータを消すと初期値に戻ります（記録も消えます）。</p>
+
       <p class="lead">■ データについて</p>
       <p>ブラウザのデータを消すと記録も消えます。バックアップ機能はありません。</p>
     </details>
@@ -511,6 +540,13 @@
     <button id="start-btn" onclick="startAll()">🚃 はっしゃ</button>
     <button id="brake-btn" onclick="pullBrake()" disabled><span class="knob"></span><span id="brake-label">ブレーキ</span></button>
   </div>
+  <div id="photo-row">
+    <button id="photo-btn" onclick="pickPhoto()" disabled>📷 しゃしんをとる</button>
+    <img id="photo-preview" alt="とった写真">
+    <button id="photo-drop" onclick="dropPhoto()">✕</button>
+  </div>
+  <input type="file" id="photo-input" accept="image/*" capture="environment"
+         style="display:none" onchange="onPhotoPicked(this)">
   <button id="clear-btn" onclick="confirmClear()">⭐ ミッション達成!スタンプGET</button>
   <div id="bonus-msg"></div>
 
@@ -634,6 +670,7 @@
 
     <div class="sec">
       <h4>🔑 あいことばの変更</h4>
+      <div class="note" id="pin-note"></div>
       <form class="edit-row" autocomplete="off" onsubmit="changePin();return false;">
         <input type="text" id="parent-code" placeholder="新しいあいことば(数字4桁など)"
                name="mq-parent-code" enterkeyhint="done"
@@ -853,7 +890,7 @@ function rewardValue(label) {
      同一オリジンに家族版の旧キーが残っている可能性があり、
      拾うと他アプリのデータを取り込んでしまうため。
    ========================================================= */
-const APP_VER = 'v12';
+const APP_VER = 'v13';
 const APP_KEY = 'mqgo_v1';
 
 /* totalMoney: ごほうびの累計。stampモードでは「こ」、moneyモードでは「円」。
@@ -917,7 +954,64 @@ function loadSettings() {
   return s;
 }
 function persistSettings() { store.settings = settings; saveStore(); }
-function getPin() { return store.pin || "1234"; }
+const DEFAULT_PIN = "1234";   /* 変更するまでの初期値。README と「はじめる前に」に明記してある */
+function getPin() { return store.pin || DEFAULT_PIN; }
+function isDefaultPin() { return !store.pin || store.pin === DEFAULT_PIN; }
+
+/* =========================================================
+   3-a. 写真の保存（IndexedDB）
+   写真は容量が大きく、localStorageだと保存自体が失敗するため
+   IndexedDBに置く。外部へは一切送らない。
+   非対応環境やエラー時は「写真だけ使えない」状態に落とし、
+   アプリの他の機能は必ず動くようにする。
+   ========================================================= */
+const PHOTO_DB = 'mqgo-photos';
+const PHOTO_STORE = 'p';
+const PHOTO_MAX = 60;          /* 端末の容量を圧迫しないよう、新しい順にこの枚数だけ残す */
+
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    try {
+      if (typeof indexedDB === 'undefined' || !indexedDB) return resolve(null);
+      const req = indexedDB.open(PHOTO_DB, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(PHOTO_STORE)) db.createObjectStore(PHOTO_STORE);
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    } catch (e) { resolve(null); }
+  });
+}
+function idbRun(mode, fn) {
+  return idbOpen().then(db => {
+    if (!db) return null;
+    return new Promise(resolve => {
+      try {
+        const tx = db.transaction(PHOTO_STORE, mode);
+        const st = tx.objectStore(PHOTO_STORE);
+        const req = fn(st);
+        tx.oncomplete = () => resolve(req ? req.result : null);
+        tx.onerror = () => resolve(null);
+        tx.onabort = () => resolve(null);
+      } catch (e) { resolve(null); }
+    });
+  }).catch(() => null);
+}
+function photoPut(id, data) { return idbRun('readwrite', st => st.put(data, id)); }
+function photoGet(id)       { return idbRun('readonly',  st => st.get(id)); }
+function photoDel(id)       { return idbRun('readwrite', st => st.delete(id)); }
+function photoKeys()        { return idbRun('readonly',  st => st.getAllKeys()); }
+
+/* 記録に残っていない写真と、古すぎる写真を片づける */
+async function prunePhotos() {
+  const keys = await photoKeys();
+  if (!keys || !keys.length) return;
+  const alive = new Set(history.filter(x => x.pid).map(x => x.pid));
+  for (const k of keys) if (!alive.has(k)) await photoDel(k);
+  const ordered = history.filter(x => x.pid).map(x => x.pid);
+  for (const id of ordered.slice(PHOTO_MAX)) await photoDel(id);
+}
 
 /* =========================================================
    3-b. 運転台の演出
@@ -1190,6 +1284,66 @@ function cabStop() {
   drawCab(0);
 }
 
+/* ---- 達成の写真（任意） ----
+   撮れない場面（雨・混雑・電池切れ）で達成できなくなると本末転倒なので、
+   写真は「撮ってもよい」ものに留める。押した人だけカメラが開く。 */
+let pendingPhoto = null;
+
+function updatePhotoBtn() {
+  const b = document.getElementById('photo-btn');
+  if (!b) return;
+  b.disabled = !currentResult.station || runningCount() > 0;
+}
+function pickPhoto() {
+  const el = document.getElementById('photo-input');
+  if (el) { el.value = ''; el.click(); }
+}
+function dropPhoto() {
+  pendingPhoto = null;
+  const row = document.getElementById('photo-row');
+  const img = document.getElementById('photo-preview');
+  if (row) row.classList.remove('has-photo');
+  if (img) img.removeAttribute('src');
+}
+/* 長辺800pxまで縮めてJPEGにする。原寸のままだと端末の容量をすぐ食う */
+function shrinkImage(file, maxSide) {
+  return new Promise(resolve => {
+    try {
+      const fr = new FileReader();
+      fr.onload = () => {
+        const im = new Image();
+        im.onload = () => {
+          try {
+            const s = Math.min(1, maxSide / Math.max(im.width, im.height));
+            const cv = document.createElement('canvas');
+            cv.width = Math.max(1, Math.round(im.width * s));
+            cv.height = Math.max(1, Math.round(im.height * s));
+            const cx = cv.getContext('2d');
+            if (!cx) return resolve(String(fr.result));
+            cx.drawImage(im, 0, 0, cv.width, cv.height);
+            resolve(cv.toDataURL('image/jpeg', 0.7));
+          } catch (e) { resolve(String(fr.result)); }
+        };
+        im.onerror = () => resolve(null);
+        im.src = String(fr.result);
+      };
+      fr.onerror = () => resolve(null);
+      fr.readAsDataURL(file);
+    } catch (e) { resolve(null); }
+  });
+}
+async function onPhotoPicked(input) {
+  const f = input && input.files && input.files[0];
+  if (!f) return;
+  const data = await shrinkImage(f, 800);
+  if (!data) { alert('しゃしんを よみこめませんでした。'); return; }
+  pendingPhoto = data;
+  const row = document.getElementById('photo-row');
+  const img = document.getElementById('photo-preview');
+  if (img) img.src = data;
+  if (row) row.classList.add('has-photo');
+}
+
 /* 行き先は車窓の中の1か所だけ。
    走行中は小さく半透明（景色を隠さない）、確定したら白い駅名標になる */
 function setDestSpinning() {
@@ -1232,6 +1386,7 @@ function updateReelFocus() {
   if (label) label.textContent = anyRunning
     ? `ブレーキ\n${REEL_NAMES[activeReel]}`
     : 'ブレーキ';
+  updatePhotoBtn();
 }
 
 /* 大きなブレーキ1本で、いまの表示器を止める */
@@ -1384,6 +1539,7 @@ function startAll() {
 
   /* 発車 */
   clearBtnReset();
+  dropPhoto();
   setDestSpinning();
   pickScene();
   activeReel = BRAKE_ORDER[0];
@@ -1488,15 +1644,28 @@ function clearMission() {
   if (!currentResult.station) return;
   clearBtnReset();
   clearSound(); confetti();
+  /* 達成できたら、その日の回数はリセットして何度でも冒険できる。
+     回数制限は「達成せずに引き直し続ける」のを防ぐためのもの */
+  spinsLeft = settings.spinsPerDay;
+  store.spinsLeft = spinsLeft;
   totalMoney += rewardValue(currentResult.money);
   store.totalMoney = totalMoney; saveStore();
 
-  history.unshift({
+  const entry = {
+    id: 'h' + Date.now() + Math.random().toString(36).slice(2, 6),
     station: currentResult.station, mission: currentResult.mission,
     money: currentResult.money, target: currentResult.target,
     date: todayKey(), mode: rewardMode(),
     time: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})
-  });
+  };
+  /* 写真は撮っていれば紐づける。保存に失敗しても記録自体は残す */
+  if (pendingPhoto) {
+    entry.pid = entry.id;
+    const data = pendingPhoto;
+    photoPut(entry.id, data).then(() => prunePhotos()).catch(() => {});
+  }
+  history.unshift(entry);
+  dropPhoto();
   store.history = history; saveStore();
   renderHistory(); updateHeader();
   document.getElementById('clear-btn').style.display = 'none';
@@ -1586,8 +1755,23 @@ function renderHistory() {
   const list = document.getElementById('history-list');
   if (history.length === 0) { list.innerHTML = "まだ記録がありません"; return; }
   list.innerHTML = history.map(h =>
-    `<div class="history-item"><span class="stamp">⭐</span> ${h.time} 【${h.station}】${h.mission}<br>→ ${h.target} に ${h.money}</div>`
+    `<div class="history-item" data-pid="${esc(h.pid || '')}">` +
+    `<span class="stamp">⭐</span> ${esc(h.time)} 【${esc(h.station)}】${esc(h.mission)}` +
+    `<br>→ ${esc(h.target)} に ${esc(h.money)}</div>`
   ).join('');
+  /* 写真は非同期に読み込んで後から差し込む（一覧の表示を待たせない） */
+  for (const el of list.querySelectorAll('.history-item[data-pid]')) {
+    const pid = el.getAttribute('data-pid');
+    if (!pid) continue;
+    photoGet(pid).then(data => {
+      if (!data) return;
+      const img = document.createElement('img');
+      img.className = 'hphoto';
+      img.alt = 'とった写真';
+      img.src = data;
+      el.insertBefore(img, el.firstChild);
+    }).catch(() => {});
+  }
 }
 function renderExcluded() {
   const box = document.getElementById('excluded-list');
@@ -1722,6 +1906,12 @@ function renderSettings() {
   // 対象者・ごほうび
   renderWeightEditor('target-editor', settings.targets);
   renderWeightEditor('money-editor', rewardTable());
+  /* あいことばが初期値のままなら、変更をすすめる */
+  const pn = document.getElementById('pin-note');
+  if (pn) pn.innerHTML = isDefaultPin()
+    ? '⚠️ いまは初期値の <b>1234</b> のままです。お子さまが覚えてしまう前に変更しておくと安心です。'
+    : '✅ 変更ずみです。わすれた場合は、ブラウザのデータを消すと初期値(1234)に戻ります。';
+
   /* えんしゅつの選択状態 */
   const mo = settings.motion !== false;
   document.getElementById('motion-on').style.opacity  = mo ? '1' : '0.4';
@@ -1848,6 +2038,7 @@ function clearHistory(){
   if (confirm("今日の記録と合計金額をすべて消しますか?")) {
     history = []; totalMoney = 0;
     store.history = history; store.totalMoney = totalMoney; saveStore();
+    prunePhotos();                 /* 記録から消えた写真も端末から消す */
     renderHistory(); updateHeader();
   }
 }

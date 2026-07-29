@@ -1252,6 +1252,157 @@ console.log('\n[35] 達成ボタンの2回押し');
   w.close();
 }
 
+
+/* ---------- 36. お地蔵さんの重なり ---------- */
+console.log('\n[36] 重なり順');
+{
+  /* 帯の下にお地蔵さんが隠れていた。主役なので最前面に置く */
+  const jz = (html.match(/#jizo \{[^}]*\}/s) || [''])[0].match(/z-index:(\d+)/);
+  const bn = (html.match(/#jizo-banner \{[^}]*\}/s) || [''])[0].match(/z-index:(\d+)/);
+  ok(jz && bn, 'どちらにも重なり順の指定がある');
+  ok(+jz[1] > +bn[1], `お地蔵さん(${jz[1]})が帯(${bn[1]})より前にいる`);
+}
+
+/* ---------- 37. 達成したら回数がもどる ---------- */
+console.log('\n[37] 達成で回数リセット');
+{
+  const { w, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  const per = w.eval('settings.spinsPerDay');
+  w.eval('startAll()');
+  eq(w.eval('spinsLeft'), per - 1, '発車すると1回へる');
+  for (let i = 0; i < 4; i++) w.eval('pullBrake()');
+  w.eval('confirmClear()'); w.eval('confirmClear()');
+  eq(w.eval('spinsLeft'), per, '達成したら回数がもどる');
+  eq(JSON.parse(w.localStorage.getItem('mqgo_v1')).spinsLeft, per, 'もどった回数が保存される');
+  ok(w.document.getElementById('spins-left').innerText.includes(String(per)), '画面表示にも反映される');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 達成しなければ減ったまま（引き直し続けるのを防ぐのが回数制限の目的） */
+  const { w } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  const per = w.eval('settings.spinsPerDay');
+  w.eval('startAll()');
+  for (let i = 0; i < 4; i++) w.eval('pullBrake()');
+  w.eval('startAll()');
+  eq(w.eval('spinsLeft'), per - 2, '達成しないと減ったまま');
+  w.close();
+}
+
+/* ---------- 38. あいことばの周知 ---------- */
+console.log('\n[38] あいことば');
+{
+  const { w, errors } = boot();
+  eq(w.eval('DEFAULT_PIN'), '1234', '初期のあいことばは1234');
+  eq(w.eval('getPin()'), '1234', '未設定なら初期値が使われる');
+  eq(w.eval('isDefaultPin()'), true, '初期値のままだと分かる');
+
+  w.prompt = () => '1234';
+  w.eval('switchTab("set")');
+  const note = w.document.getElementById('pin-note');
+  ok(note.textContent.includes('1234'), '初期値のままなら設定画面で知らせる');
+  ok(note.textContent.includes('変更'), '変更をすすめている');
+
+  w.document.getElementById('parent-code').value = '4649';
+  w.eval('changePin()');
+  eq(w.eval('isDefaultPin()'), false, '変更したら初期値ではなくなる');
+  w.eval('renderSettings()');
+  ok(w.document.getElementById('pin-note').textContent.includes('変更ずみ'), '変更後は表示が変わる');
+
+  /* 配布したときに保護者が分かるよう、注意書きにも書いてある */
+  const notice = w.document.getElementById('notice').textContent;
+  ok(notice.includes('1234'), '「はじめる前に」に初期値が書いてある');
+  ok(notice.includes('誤操作'), '秘密ではなく誤操作防止だと説明している');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 39. 達成の写真（任意） ---------- */
+console.log('\n[39] 写真');
+{
+  const { w, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  const d = w.document;
+  const pb = d.getElementById('photo-btn');
+  ok(pb, '「しゃしんをとる」ボタンがある');
+  eq(pb.disabled, true, '行き先が決まる前は撮れない');
+
+  w.eval('startAll()');
+  eq(pb.disabled, true, '走行中は撮れない');
+  for (let i = 0; i < 4; i++) w.eval('pullBrake()');
+  eq(pb.disabled, false, '停車したら撮れる');
+
+  /* 撮らなくても達成できる（これがA案の肝） */
+  w.eval('confirmClear()'); w.eval('confirmClear()');
+  eq(w.eval('history.length'), 1, '写真がなくても達成できる');
+  eq(w.eval('history[0].pid'), undefined, '写真なしの記録には写真idが付かない');
+  ok(w.eval('history[0].id').length > 0, '記録にidが振られる');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 写真を撮ってから達成すると、記録に紐づく */
+  const { w, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.eval('startAll()');
+  for (let i = 0; i < 4; i++) w.eval('pullBrake()');
+  w.eval('pendingPhoto = "data:image/jpeg;base64,AAAA"');
+  w.eval('confirmClear()'); w.eval('confirmClear()');
+  const e0 = w.eval('history[0]');
+  eq(e0.pid, e0.id, '写真は記録のidで紐づく');
+  eq(w.eval('pendingPhoto'), null, '達成したら次に持ち越さない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 取り消しと、発車での破棄 */
+  const { w } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.eval('pendingPhoto = "data:image/jpeg;base64,AAAA"');
+  w.eval('document.getElementById("photo-row").classList.add("has-photo")');
+  w.eval('dropPhoto()');
+  eq(w.eval('pendingPhoto'), null, '✕ で取り消せる');
+  ok(!w.document.getElementById('photo-row').classList.contains('has-photo'), 'プレビューも消える');
+
+  w.eval('pendingPhoto = "data:image/jpeg;base64,AAAA"');
+  w.eval('startAll()');
+  eq(w.eval('pendingPhoto'), null, '発車したら前の写真は捨てる');
+  w.close();
+}
+{
+  /* IndexedDBが無い環境でも、写真以外は普通に動く（この環境がそれ） */
+  const { w, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  ok(typeof w.indexedDB === 'undefined' || !w.indexedDB, 'IndexedDBが無い環境を再現している');
+  w.eval('startAll()');
+  for (let i = 0; i < 4; i++) w.eval('pullBrake()');
+  w.eval('pendingPhoto = "data:image/jpeg;base64,AAAA"');
+  w.eval('confirmClear()'); w.eval('confirmClear()');
+  eq(w.eval('history.length'), 1, '写真を保存できない環境でも記録は残る');
+  w.eval('renderHistory()');
+  ok(w.document.getElementById('history-list').textContent.length > 0, '一覧も描ける');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 容量対策と、正直な説明 */
+  const { w } = boot();
+  eq(w.eval('PHOTO_MAX'), 60, '残す枚数に上限がある');
+  eq(w.eval('typeof prunePhotos'), 'function', '不要な写真を片づける処理がある');
+  const notice = w.document.getElementById('notice').textContent;
+  ok(notice.includes('しゃしん'), '注意書きに写真の説明がある');
+  ok(notice.includes('任意'), '任意であることを明記している');
+  ok(notice.includes('端末の中だけ'), '端末内にのみ保存すると書いてある');
+  w.close();
+  /* 事業者向けの説明も事実と合っているか */
+  const readme = fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8');
+  ok(/カメラは「📷 しゃしんをとる」を押したときだけ/.test(readme), 'READMEがカメラの扱いを正しく書いている');
+  ok(!readme.includes('カメラ・位置情報・通知のいずれも要求しません'), '古い「権限要求なし」の記述が残っていない');
+  ok(/IndexedDB/.test(readme), '写真の保存先も書いてある');
+}
+
 /* ---------- 結果 ---------- */
 console.log(`\n${'='.repeat(46)}`);
 console.log(`  passed: ${passed}  failed: ${failed}`);
