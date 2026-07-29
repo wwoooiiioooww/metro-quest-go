@@ -856,6 +856,14 @@ function rewardValue(label) {
   return (s.match(/[★⭐]/g) || []).length;
 }
 
+/* 記録1件がどちらのごほうびだったか。
+   mode を持つ前の古い記録もあるので、無ければラベルから判断する
+   （★や⭐が入っていればスタンプ、それ以外は円） */
+function entryMode(h) {
+  if (h && (h.mode === 'stamp' || h.mode === 'money')) return h.mode;
+  return /[★⭐]/.test(String(h && h.money)) ? 'stamp' : 'money';
+}
+
 /* =========================================================
    3. 状態管理
    localStorageは単一キー(APP_KEY)に集約する。
@@ -866,13 +874,29 @@ function rewardValue(label) {
      同一オリジンに家族版の旧キーが残っている可能性があり、
      拾うと他アプリのデータを取り込んでしまうため。
    ========================================================= */
-const APP_VER = 'v14';
+const APP_VER = 'v15';
 const APP_KEY = 'mqgo_v1';
 
-/* totalMoney: ごほうびの累計。stampモードでは「こ」、moneyモードでは「円」。
-   家族版とのdiffを小さく保つため変数名は据え置いている(SYNC.md参照) */
+/* 累計は種類ごとに分けて持つ。
+   ⭐と円は単位が違うので、1つの数に足し込むと
+   モードを切り替えたときに「55こ」に「100円」が足されてしまう。 */
+function blankTotals() { return { stamp: 0, money: 0 }; }
 function blankStore() {
-  return { settings:null, spinsLeft:null, excluded:[], history:[], totalMoney:0, pin:null, noticeSeen:false };
+  /* totals は null で置く。loadStore の Object.assign で {0,0} が入ってしまうと
+     migrateTotals が「移行ずみ」と誤認し、古い累計を捨ててしまう */
+  return { settings:null, spinsLeft:null, excluded:[], history:[], totals:null, pin:null, noticeSeen:false };
+}
+
+/* v14まで: totalMoney という1つの数に⭐と円を混ぜて足していた。
+   記録は間引かず、記録を消すときは累計も一緒に0にしているので、
+   履歴をモードごとに数えなおせば、正しい値に必ず復元できる。 */
+function migrateTotals(s) {
+  if (s && s.totals && typeof s.totals === 'object') {
+    return { stamp: +s.totals.stamp || 0, money: +s.totals.money || 0 };
+  }
+  const t = blankTotals();
+  for (const e of ((s && s.history) || [])) t[entryMode(e)] += rewardValue(e.money);
+  return t;
 }
 
 function loadStore() {
@@ -894,7 +918,9 @@ let settings = loadSettings();
 let spinsLeft = store.spinsLeft ?? settings.spinsPerDay;
 let excludedStations = store.excluded;
 let history = store.history;
-let totalMoney = store.totalMoney;
+let totals = migrateTotals(store);
+store.totals = totals;
+delete store.totalMoney;        /* 混ざった古い値は残さない */
 let intervals = [null,null,null,null];
 let isRunning = [false,false,false,false];
 let currentResult = { station:"", mission:"", money:"", target:"" };
@@ -1537,8 +1563,8 @@ function clearMission() {
      回数制限は「達成せずに引き直し続ける」のを防ぐためのもの */
   spinsLeft = settings.spinsPerDay;
   store.spinsLeft = spinsLeft;
-  totalMoney += rewardValue(currentResult.money);
-  store.totalMoney = totalMoney; saveStore();
+  totals[rewardMode()] += rewardValue(currentResult.money);
+  store.totals = totals; saveStore();
 
   /* id は表示には使っていないが、記録1件を一意に指せるようにしておく */
   const entry = {
@@ -1597,7 +1623,7 @@ function todayKey() {
    ごほうびモードが違う記録は合計に混ぜない(★と円が足し合わされないように) */
 function todayStats() {
   const t = todayKey(), m = rewardMode();
-  const mine = history.filter(h => h.date === t && (h.mode || 'money') === m);
+  const mine = history.filter(h => h.date === t && entryMode(h) === m);
   return {
     count : mine.length,
     reward: mine.reduce((s,h) => s + rewardValue(h.money), 0),
@@ -1618,7 +1644,7 @@ function updateHeader() {
   const rw = rewardDef(), st = todayStats();
   document.getElementById('spins-left').innerText = `残り回数:${spinsLeft}回`;
   document.getElementById('total-money').innerText =
-    `今日:${st.reward}${rw.unit} ${rw.icon}　累計:${totalMoney}${rw.unit}`;
+    `今日:${st.reward}${rw.unit} ${rw.icon}　累計:${totals[rewardMode()]}${rw.unit}`;
   const days = st.days > 0 ? `・ぼうけん${st.days}日` : '';
   document.getElementById('rank').innerHTML =
     `${getRank(history.length)}　<span class="sub">クリア${history.length}回${days}</span>` +
@@ -1908,8 +1934,8 @@ function resetSpins(){
 }
 function clearHistory(){
   if (confirm("今日の記録と合計金額をすべて消しますか?")) {
-    history = []; totalMoney = 0;
-    store.history = history; store.totalMoney = totalMoney; saveStore();
+    history = []; totals = blankTotals();
+    store.history = history; store.totals = totals; saveStore();
     renderHistory(); updateHeader();
   }
 }

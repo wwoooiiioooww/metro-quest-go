@@ -22,6 +22,11 @@ function ok(cond, name) {
   else { failed++; fails.push(name); console.log('  ✗ ' + name); }
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+/* アプリの todayKey() と同じ形式。日付をまたぐ記録の仕込みに使う */
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 function eq(a, b, name) {
   const same = Object.is(a, b);
   ok(same, name + (same ? '' : ` (got ${JSON.stringify(a)}, want ${JSON.stringify(b)})`));
@@ -53,7 +58,8 @@ console.log('\n[1] 起動');
 {
   const { w, errors } = boot();
   ok(w.eval('store') !== null, '起動して store が初期化される');
-  eq(w.eval('totalMoney'), 0, '合計は0から始まる');
+  eq(w.eval('totals.stamp'), 0, 'スタンプの累計は0から始まる');
+  eq(w.eval('totals.money'), 0, 'おこづかいの累計は0から始まる');
   eq(w.localStorage.getItem('mqgo_v1'), null, '起動しただけでは書き込まない');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
@@ -75,7 +81,7 @@ console.log('\n[2] 家族版との分離');
   };
   const { w, errors } = boot(family);
 
-  eq(w.eval('totalMoney'), 0, '家族版のmq_v1を読み込まない');
+  eq(w.eval('totals.stamp') + w.eval('totals.money'), 0, '家族版のmq_v1を読み込まない');
   eq(w.eval('history.length'), 0, 'v4旧キーの記録を取り込まない');
   eq(w.eval('getPin()'), '1234', 'PINは既定値(旧キーのPINを拾わない)');
   eq(w.eval('excludedStations.length'), 0, '旧キーの除外駅を取り込まない');
@@ -178,8 +184,9 @@ console.log('\n[4] ごほうび(スタンプ / おこづかい)');
   eq(w.eval('rewardValue("なし")'), 0, 'rewardValue: 数字なし → 0');
   w.eval('currentResult = {station:"上野", mission:"テスト", money:"⭐3こ", target:"みんな"}');
   w.eval('clearMission()');
-  eq(w.eval('totalMoney'), 3, 'スタンプが合計に加算される');
-  eq(JSON.parse(w.localStorage.getItem('mqgo_v1')).totalMoney, 3, '加算が保存される');
+  eq(w.eval('totals.stamp'), 3, 'スタンプが合計に加算される');
+  eq(w.eval('totals.money'), 0, 'おこづかいの側は増えない');
+  eq(JSON.parse(w.localStorage.getItem('mqgo_v1')).totals.stamp, 3, '加算が保存される');
   w.close();
 }
 
@@ -189,7 +196,7 @@ console.log('\n[4b] 今日の分と累計');
   const d = new Date();
   const T = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const st = {
-    settings:null, spinsLeft:null, excluded:[], pin:null, noticeSeen:true, totalMoney: 40,
+    settings:null, spinsLeft:null, excluded:[], pin:null, noticeSeen:true, totals: { stamp: 40, money: 0 },
     history: [
       { station:'上野', money:'★★★',  date:T,            mode:'stamp' },
       { station:'銀座', money:'★★',    date:T,            mode:'stamp' },
@@ -1440,6 +1447,97 @@ console.log('\n[42] 写真の取り下げ');
   ok(!/しゃしんをとる/.test(readme), 'READMEから写真ボタンの記述が消えている');
   ok(!/IndexedDB/.test(readme), 'READMEからIndexedDBの記述が消えている');
   ok(/端末の権限要求.+\*\*なし。\*\* カメラ/.test(readme), 'READMEが「権限要求：なし」に戻っている');
+}
+
+/* ---------- 43. ⭐と円の累計を混ぜない ---------- */
+/* 実機で起きた不具合: ⭐が55あるときに おこづかい へ切り替えて100円ゲットすると
+   「155円」になっていた。単位の違うものを1つの数に足し込んでいたため。 */
+console.log('\n[43] 累計はモードごとに分ける');
+{
+  const { w, errors } = boot();
+  eq(w.eval('typeof totals'), 'object', '累計は種類ごとのオブジェクト');
+  eq(w.eval('typeof totalMoney'), 'undefined', '混ざる元だった totalMoney は無くなっている');
+
+  /* スタンプで55こためる */
+  w.eval('currentResult = {station:"上野", mission:"t", money:"⭐55こ", target:"みんな"}');
+  w.eval('clearMission()');
+  eq(w.eval('totals.stamp'), 55, 'スタンプに55こ');
+  ok(w.document.getElementById('total-money').innerText.includes('累計:55こ'), '⭐55こと出る');
+
+  /* おこづかいへ切り替える → 円の累計は0のまま */
+  w.eval('setRewardMode("money")');
+  eq(w.eval('totals.money'), 0, '切り替えただけでは円は増えない');
+  const t1 = w.document.getElementById('total-money').innerText;
+  ok(t1.includes('累計:0円'), `切替直後は0円 (${t1})`);
+  ok(!t1.includes('55'), '⭐の55が円に持ち込まれない');
+
+  /* 100円ゲット → 155円ではなく100円 */
+  w.eval('currentResult = {station:"銀座", mission:"t", money:"100円", target:"みんな"}');
+  w.eval('clearMission()');
+  eq(w.eval('totals.money'), 100, '円は100');
+  eq(w.eval('totals.stamp'), 55, 'スタンプ側は変わらない');
+  const t2 = w.document.getElementById('total-money').innerText;
+  ok(t2.includes('累計:100円'), `100円と出る (${t2})`);
+  ok(!t2.includes('155'), '155円にならない(これが不具合だった)');
+
+  /* 戻すと⭐は元のまま */
+  w.eval('setRewardMode("stamp")');
+  ok(w.document.getElementById('total-money').innerText.includes('累計:55こ'), '戻すと⭐55こ');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* v14までの混ざった値からの移行。履歴は間引かないので数えなおせる */
+  const T = todayStr();
+  const old = {
+    settings:null, spinsLeft:null, excluded:[], pin:null, noticeSeen:true,
+    totalMoney: 155,                    /* 混ざった古い値 */
+    history: [
+      { station:'新橋', money:'100円',  date:T, mode:'money' },
+      { station:'上野', money:'⭐55こ', date:T, mode:'stamp' },
+    ],
+  };
+  const { w, errors } = boot({ mqgo_v1: JSON.stringify(old) });
+  eq(w.eval('totals.stamp'), 55, '古い155から⭐55こを取り出せる');
+  eq(w.eval('totals.money'), 100, '古い155から100円を取り出せる');
+  eq(w.eval('history.length'), 2, '記録は消さない');
+  w.eval('saveStore()');
+  eq(JSON.parse(w.localStorage.getItem('mqgo_v1')).totalMoney, undefined, '混ざった古い値は残さない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* mode を持たない古い記録も、ラベルから振り分けられる */
+  const T = todayStr();
+  const old = {
+    settings:null, spinsLeft:null, excluded:[], pin:null, noticeSeen:true, totalMoney: 703,
+    history: [
+      { station:'浅草', money:'500円', date:T },   /* mode なし */
+      { station:'銀座', money:'★★★', date:T },   /* mode なし・旧★ */
+      { station:'上野', money:'200円', date:T },
+    ],
+  };
+  const { w, errors } = boot({ mqgo_v1: JSON.stringify(old) });
+  eq(w.eval('totals.money'), 700, 'modeが無くても円は円に');
+  eq(w.eval('totals.stamp'), 3, 'modeが無くても★はスタンプに');
+  eq(w.eval(`entryMode({money:'★★'})`), 'stamp', '★のラベルはスタンプ扱い');
+  eq(w.eval(`entryMode({money:'300円'})`), 'money', '円のラベルはおこづかい扱い');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 記録を消したら、両方の累計が0になる */
+  const { w } = boot();
+  w.eval('currentResult = {station:"上野", mission:"t", money:"⭐5こ", target:"みんな"}');
+  w.eval('clearMission()');
+  w.eval('setRewardMode("money")');
+  w.eval('currentResult = {station:"銀座", mission:"t", money:"300円", target:"みんな"}');
+  w.eval('clearMission()');
+  w.eval('clearHistory()');
+  eq(w.eval('totals.stamp'), 0, '記録を消したらスタンプも0');
+  eq(w.eval('totals.money'), 0, '記録を消したら円も0');
+  eq(w.eval('history.length'), 0, '記録も空');
+  w.close();
 }
 
 /* ---------- 結果 ---------- */
