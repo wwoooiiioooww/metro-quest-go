@@ -1319,88 +1319,127 @@ console.log('\n[38] あいことば');
   w.close();
 }
 
-/* ---------- 39. 達成の写真（任意） ---------- */
-console.log('\n[39] 写真');
+/* ---------- 39. あいことばの入力画面に初期値を出す ---------- */
+/* 配ったばかりの人は 1234 を知らないので、保護者モードに入れなかった。
+   ただし変更後に 1234 と出したら嘘になるので、初期値のときだけ出す */
+console.log('\n[39] あいことばの案内');
+{
+  const { w, errors } = boot();
+  let asked = '';
+  w.prompt = (msg) => { asked = String(msg); return '1234'; };
+  w.eval('switchTab("set")');
+  ok(asked.includes('1234'), '初期値のままなら入力画面に1234と書いてある');
+  ok(asked.includes('変更'), '変更できることも書いてある');
+
+  w.document.getElementById('parent-code').value = '4649';
+  w.eval('changePin()');
+  w.eval('lockParent()');
+  asked = '';
+  w.prompt = (msg) => { asked = String(msg); return '4649'; };
+  w.eval('switchTab("set")');
+  ok(!asked.includes('1234'), '変更後は 1234 と出さない（嘘にならない）');
+  ok(asked.includes('あいことば'), '入力を求める文言は残っている');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 40. 表示器は順番に1つずつ回す ---------- */
+/* 4つ同時に回ると目が疲れるとの指摘。回るのは常にブレーキが向いている1つだけ */
+console.log('\n[40] 順番に回す');
 {
   const { w, errors } = boot();
   w.eval('hideSplash()'); w.eval('closeNotice()');
   const d = w.document;
-  const pb = d.getElementById('photo-btn');
-  ok(pb, '「しゃしんをとる」ボタンがある');
-  eq(pb.disabled, true, '行き先が決まる前は撮れない');
+  eq(w.eval('REEL_COVER'), '- - -', 'まだの表示器はハイフンで伏せる');
 
   w.eval('startAll()');
-  eq(pb.disabled, true, '走行中は撮れない');
-  for (let i = 0; i < 4; i++) w.eval('pullBrake()');
-  eq(pb.disabled, false, '停車したら撮れる');
+  eq(w.eval('BRAKE_ORDER[0]'), 0, '最初に止めるのは行き先');
+  eq(w.eval('intervals[0] ? 1 : 0'), 1, '発車したら行き先だけが回る');
+  for (const i of [1, 2, 3]) {
+    eq(w.eval(`intervals[${i}] ? 1 : 0`), 0, `表示器${i}はまだ回っていない`);
+    ok(d.getElementById('reel-' + i).classList.contains('pending'), `表示器${i}は伏せてある`);
+    eq(d.getElementById('reel-' + i).innerText, '- - -', `表示器${i}はハイフンのまま`);
+  }
+  /* 4つとも「未確定」ではある（ブレーキの残り本数の数え方は変えていない） */
+  eq(w.eval('runningCount()'), 4, '未確定の数はこれまでどおり4');
 
-  /* 撮らなくても達成できる（これがA案の肝） */
-  w.eval('confirmClear()'); w.eval('confirmClear()');
-  eq(w.eval('history.length'), 1, '写真がなくても達成できる');
-  eq(w.eval('history[0].pid'), undefined, '写真なしの記録には写真idが付かない');
-  ok(w.eval('history[0].id').length > 0, '記録にidが振られる');
+  /* 1本目のブレーキ → 行き先が確定し、次（ごほうび）が回りだす */
+  w.eval('pullBrake()');
+  eq(w.eval('activeReel'), 2, '次はごほうび');
+  eq(w.eval('intervals[2] ? 1 : 0'), 1, 'ブレーキを引いてはじめて回りだす');
+  ok(!d.getElementById('reel-2').classList.contains('pending'), '回りだしたら伏せをはずす');
+  ok(!d.getElementById('reel-0').classList.contains('pending'), '確定した表示器も伏せない');
+  ok(d.getElementById('reel-1').classList.contains('pending'), 'まだ先の表示器は伏せたまま');
+  eq(w.eval('intervals[0]'), null, '止めた表示器のタイマーは残さない');
+
+  /* 最後まで引ける（順番に回しても4つとも確定する） */
+  w.eval('pullBrake()'); w.eval('pullBrake()'); w.eval('pullBrake()');
+  eq(w.eval('runningCount()'), 0, '4回で全部決まる');
+  for (const i of [0, 1, 2, 3]) {
+    ok(!d.getElementById('reel-' + i).classList.contains('pending'), `確定後の表示器${i}は伏せていない`);
+    ok(d.getElementById('reel-' + i).innerText !== '- - -', `確定後の表示器${i}に中身がある`);
+  }
+  ok(w.eval('currentResult.station').length > 0, '行き先が入っている');
+  ok(w.eval('currentResult.money').length > 0, 'ごほうびが入っている');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }
-{
-  /* 写真を撮ってから達成すると、記録に紐づく */
-  const { w, errors } = boot();
-  w.eval('hideSplash()'); w.eval('closeNotice()');
-  w.eval('startAll()');
-  for (let i = 0; i < 4; i++) w.eval('pullBrake()');
-  w.eval('pendingPhoto = "data:image/jpeg;base64,AAAA"');
-  w.eval('confirmClear()'); w.eval('confirmClear()');
-  const e0 = w.eval('history[0]');
-  eq(e0.pid, e0.id, '写真は記録のidで紐づく');
-  eq(w.eval('pendingPhoto'), null, '達成したら次に持ち越さない');
-  eq(errors.length, 0, 'runtime errors: none');
-  w.close();
-}
-{
-  /* 取り消しと、発車での破棄 */
-  const { w } = boot();
-  w.eval('hideSplash()'); w.eval('closeNotice()');
-  w.eval('pendingPhoto = "data:image/jpeg;base64,AAAA"');
-  w.eval('document.getElementById("photo-row").classList.add("has-photo")');
-  w.eval('dropPhoto()');
-  eq(w.eval('pendingPhoto'), null, '✕ で取り消せる');
-  ok(!w.document.getElementById('photo-row').classList.contains('has-photo'), 'プレビューも消える');
 
-  w.eval('pendingPhoto = "data:image/jpeg;base64,AAAA"');
-  w.eval('startAll()');
-  eq(w.eval('pendingPhoto'), null, '発車したら前の写真は捨てる');
-  w.close();
-}
+/* ---------- 41. ブレーキの色 ---------- */
+/* はっしゃ が「黄→灰」で分かるのに、ブレーキは「灰→灰」で区別がつかなかった */
+console.log('\n[41] ブレーキの色');
 {
-  /* IndexedDBが無い環境でも、写真以外は普通に動く（この環境がそれ） */
+  const css = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+  const startOff = /#start-btn:disabled\s*\{([^}]*)\}/.exec(css);
+  const brakeOff = /#brake-btn:disabled\s*\{([^}]*)\}/.exec(css);
+  const brakeOn  = /#brake-btn\s*\{([^}]*)\}/.exec(css);
+  ok(startOff && brakeOff && brakeOn, '3つのルールが揃っている');
+  const greyOf = s => (/#([0-9a-f]{6})/i.exec(s) || [])[1];
+  eq(greyOf(brakeOff[1]), greyOf(startOff[1]), '押せないときは はっしゃ と同じ灰色');
+  ok(!/#6d757b/i.test(brakeOn[1]), '押せるときは灰色ではない');
+  ok(/#9df3f6|#25c6d8/i.test(brakeOn[1]), '押せるときは明るい色');
+  ok(/color:#06323c/i.test(brakeOn[1]), '明るい下地に合わせて文字は濃い色');
+}
+
+/* ---------- 42. 写真機能は取り下げた ---------- */
+/* 「ボタンの位置も目的もあいまい」との判断で v14 で削除。
+   説明（注意書き・README）に嘘が残らないことまで見る */
+console.log('\n[42] 写真の取り下げ');
+{
   const { w, errors } = boot();
   w.eval('hideSplash()'); w.eval('closeNotice()');
-  ok(typeof w.indexedDB === 'undefined' || !w.indexedDB, 'IndexedDBが無い環境を再現している');
+  const d = w.document;
+  for (const id of ['photo-row', 'photo-btn', 'photo-preview', 'photo-drop', 'photo-input']) {
+    ok(!d.getElementById(id), `#${id} が残っていない`);
+  }
+  for (const fn of ['pickPhoto', 'dropPhoto', 'onPhotoPicked', 'shrinkImage', 'prunePhotos', 'photoPut', 'idbOpen']) {
+    eq(w.eval(`typeof ${fn}`), 'undefined', `${fn}() が残っていない`);
+  }
+  ok(!/indexedDB/i.test(html), 'IndexedDBを使わなくなった');
+  ok(!/capture="environment"/.test(html), 'カメラを開く入力欄が残っていない');
+
+  /* 記録はこれまでどおり残る。idだけは将来のために残してある */
   w.eval('startAll()');
   for (let i = 0; i < 4; i++) w.eval('pullBrake()');
-  w.eval('pendingPhoto = "data:image/jpeg;base64,AAAA"');
   w.eval('confirmClear()'); w.eval('confirmClear()');
-  eq(w.eval('history.length'), 1, '写真を保存できない環境でも記録は残る');
+  eq(w.eval('history.length'), 1, '達成の記録はこれまでどおり残る');
+  ok(w.eval('history[0].id').length > 0, '記録のidは残してある');
+  eq(w.eval('history[0].pid'), undefined, '写真idは付かない');
   w.eval('renderHistory()');
-  ok(w.document.getElementById('history-list').textContent.length > 0, '一覧も描ける');
+  ok(!d.querySelector('.hphoto'), '一覧に写真は出ない');
+  ok(d.getElementById('history-list').textContent.length > 0, '一覧は描ける');
+
+  const notice = d.getElementById('notice').textContent;
+  ok(!notice.includes('しゃしん'), '注意書きから写真の説明が消えている');
+  ok(notice.includes('1234'), 'あいことばの説明は残っている');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
-}
-{
-  /* 容量対策と、正直な説明 */
-  const { w } = boot();
-  eq(w.eval('PHOTO_MAX'), 60, '残す枚数に上限がある');
-  eq(w.eval('typeof prunePhotos'), 'function', '不要な写真を片づける処理がある');
-  const notice = w.document.getElementById('notice').textContent;
-  ok(notice.includes('しゃしん'), '注意書きに写真の説明がある');
-  ok(notice.includes('任意'), '任意であることを明記している');
-  ok(notice.includes('端末の中だけ'), '端末内にのみ保存すると書いてある');
-  w.close();
-  /* 事業者向けの説明も事実と合っているか */
+
+  /* 事業者向けの説明を、実装に戻す */
   const readme = fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8');
-  ok(/カメラは「📷 しゃしんをとる」を押したときだけ/.test(readme), 'READMEがカメラの扱いを正しく書いている');
-  ok(!readme.includes('カメラ・位置情報・通知のいずれも要求しません'), '古い「権限要求なし」の記述が残っていない');
-  ok(/IndexedDB/.test(readme), '写真の保存先も書いてある');
+  ok(!/しゃしんをとる/.test(readme), 'READMEから写真ボタンの記述が消えている');
+  ok(!/IndexedDB/.test(readme), 'READMEからIndexedDBの記述が消えている');
+  ok(/端末の権限要求.+\*\*なし。\*\* カメラ/.test(readme), 'READMEが「権限要求：なし」に戻っている');
 }
 
 /* ---------- 結果 ---------- */

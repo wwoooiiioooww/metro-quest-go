@@ -231,6 +231,8 @@
   /* いま回している段を光らせる。位置は固定したまま（ブレーキがズレないように） */
   .reel-row.active { border-color:var(--cyan); box-shadow:0 0 10px rgba(0,210,211,.35); }
   .reel-row.done .reel-box { color:#9fd8ff; }
+  /* まだ順番が来ていない表示器。回さずハイフンのまま伏せておく */
+  .reel-box.pending { color:#33465e; text-shadow:none; letter-spacing:3px; }
   .reel-label {
     font-size:0.62em; color:var(--grey); writing-mode:vertical-rl; text-orientation:upright;
     letter-spacing:1px; flex-shrink:0;
@@ -248,8 +250,9 @@
   .stop-btn { display:none; }
   /* ブレーキ */
   #brake-btn {
-    background:linear-gradient(180deg,#3d4e69,#22304a); color:#fff;
-    border:2px solid #55688a; font-size:0.82em; box-shadow:0 5px #16203a;
+    background:linear-gradient(180deg,#9df3f6,#25c6d8); color:#06323c;
+    border:2px solid #c8f8fa; font-size:0.82em; box-shadow:0 5px #0d7b8a;
+    text-shadow:none;
   }
   #brake-btn #brake-label { white-space:pre-line; line-height:1.2; text-align:center; }
   #brake-btn .knob {
@@ -257,10 +260,14 @@
     background:radial-gradient(circle at 35% 30%, #ff8a80, var(--red));
     box-shadow:0 2px 5px #000; transition:transform .12s;
   }
-  #brake-btn:active, #brake-btn.pulled { transform:translateY(5px); box-shadow:0 0 #16203a; }
+  #brake-btn:active, #brake-btn.pulled { transform:translateY(5px); box-shadow:0 0 #0d7b8a; }
   #brake-btn:active .knob, #brake-btn.pulled .knob { transform:translateY(7px); }
-  #brake-btn:disabled { background:#2a3244; border-color:#3a4358; color:#6b7590; box-shadow:0 5px #1a2030; }
-  #brake-btn:disabled .knob { background:#4a5468; box-shadow:none; }
+  /* 押せないときは はっしゃ と同じ灰色。2つのボタンで見え方をそろえる */
+  #brake-btn:disabled {
+    background:#6d757b; border-color:#6d757b; color:#e2e6e8;
+    box-shadow:0 5px #4a5054; text-shadow:none;
+  }
+  #brake-btn:disabled .knob { background:#9aa2a8; box-shadow:none; }
 
   /* 発車とブレーキ。左右に同じ大きさで並べる */
   #main-controls { display:flex; gap:10px; width:92%; max-width:360px; margin:10px auto 0; }
@@ -276,26 +283,6 @@
   #start-btn:active { transform:translateY(5px); box-shadow:0 0 var(--orange); }
   #start-btn:disabled { background:#6d757b; box-shadow:0 5px #4a5054; color:#e2e6e8; }
   #clear-btn { margin-top:9px; padding:11px 20px; transition:background .2s; }
-  /* 写真は任意。撮らなくても達成できる（撮れない場面を作らないため） */
-  #photo-row { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:9px; }
-  #photo-btn {
-    background:#34597a; color:#fff; border:2px solid #4d7ea8; border-radius:10px;
-    padding:8px 14px; font-size:0.85em; font-weight:bold; cursor:pointer;
-  }
-  #photo-btn:disabled { background:#2a3244; border-color:#3a4358; color:#6b7590; }
-  #photo-preview {
-    display:none; width:46px; height:46px; object-fit:cover;
-    border-radius:8px; border:2px solid var(--cyan);
-  }
-  #photo-drop {
-    display:none; background:var(--red); color:#fff; border:none;
-    border-radius:8px; padding:6px 9px; font-size:0.8em; cursor:pointer;
-  }
-  #photo-row.has-photo #photo-preview, #photo-row.has-photo #photo-drop { display:inline-block; }
-  .history-item .hphoto {
-    width:52px; height:52px; object-fit:cover; border-radius:6px;
-    border:1px solid var(--line); float:right; margin-left:8px;
-  }
   /* 1回目のタップでこの状態になる。もう一度押すまで確定しない */
   #clear-btn.armed {
     background-color:var(--orange); box-shadow:0 4px #b9770e;
@@ -471,10 +458,6 @@
       <p class="lead">■ 免責</p>
       <p>本アプリは現状のまま提供されます。ご利用にともなって生じたいかなる損害についても、制作者は責任を負いません。</p>
 
-      <p class="lead">■ しゃしんについて</p>
-      <p>ミッション達成のときに<b>写真を撮ることができます（任意）</b>。撮らなくても達成できます。<br>
-      「📷 しゃしんをとる」を押したときだけカメラが開きます。撮った写真は<b>この端末の中だけ</b>に保存され、外部へ送られることはありません。新しい60枚を超えると、古いものから自動で消えます。</p>
-
       <p class="lead">■ 保護者用の「あいことば」について</p>
       <p>⚙️せってい を開くときに必要です。<b>はじめは「1234」</b>になっています。せってい内でいつでも変更できます。<br>
       これは秘密を守るためのものではなく、<b>お子さまの誤操作を防ぐため</b>のものです。わすれた場合は、ブラウザのデータを消すと初期値に戻ります（記録も消えます）。</p>
@@ -540,13 +523,6 @@
     <button id="start-btn" onclick="startAll()">🚃 はっしゃ</button>
     <button id="brake-btn" onclick="pullBrake()" disabled><span class="knob"></span><span id="brake-label">ブレーキ</span></button>
   </div>
-  <div id="photo-row">
-    <button id="photo-btn" onclick="pickPhoto()" disabled>📷 しゃしんをとる</button>
-    <img id="photo-preview" alt="とった写真">
-    <button id="photo-drop" onclick="dropPhoto()">✕</button>
-  </div>
-  <input type="file" id="photo-input" accept="image/*" capture="environment"
-         style="display:none" onchange="onPhotoPicked(this)">
   <button id="clear-btn" onclick="confirmClear()">⭐ ミッション達成!スタンプGET</button>
   <div id="bonus-msg"></div>
 
@@ -890,7 +866,7 @@ function rewardValue(label) {
      同一オリジンに家族版の旧キーが残っている可能性があり、
      拾うと他アプリのデータを取り込んでしまうため。
    ========================================================= */
-const APP_VER = 'v13';
+const APP_VER = 'v14';
 const APP_KEY = 'mqgo_v1';
 
 /* totalMoney: ごほうびの累計。stampモードでは「こ」、moneyモードでは「円」。
@@ -959,62 +935,7 @@ function getPin() { return store.pin || DEFAULT_PIN; }
 function isDefaultPin() { return !store.pin || store.pin === DEFAULT_PIN; }
 
 /* =========================================================
-   3-a. 写真の保存（IndexedDB）
-   写真は容量が大きく、localStorageだと保存自体が失敗するため
-   IndexedDBに置く。外部へは一切送らない。
-   非対応環境やエラー時は「写真だけ使えない」状態に落とし、
-   アプリの他の機能は必ず動くようにする。
-   ========================================================= */
-const PHOTO_DB = 'mqgo-photos';
-const PHOTO_STORE = 'p';
-const PHOTO_MAX = 60;          /* 端末の容量を圧迫しないよう、新しい順にこの枚数だけ残す */
-
-function idbOpen() {
-  return new Promise((resolve, reject) => {
-    try {
-      if (typeof indexedDB === 'undefined' || !indexedDB) return resolve(null);
-      const req = indexedDB.open(PHOTO_DB, 1);
-      req.onupgradeneeded = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains(PHOTO_STORE)) db.createObjectStore(PHOTO_STORE);
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => resolve(null);
-    } catch (e) { resolve(null); }
-  });
-}
-function idbRun(mode, fn) {
-  return idbOpen().then(db => {
-    if (!db) return null;
-    return new Promise(resolve => {
-      try {
-        const tx = db.transaction(PHOTO_STORE, mode);
-        const st = tx.objectStore(PHOTO_STORE);
-        const req = fn(st);
-        tx.oncomplete = () => resolve(req ? req.result : null);
-        tx.onerror = () => resolve(null);
-        tx.onabort = () => resolve(null);
-      } catch (e) { resolve(null); }
-    });
-  }).catch(() => null);
-}
-function photoPut(id, data) { return idbRun('readwrite', st => st.put(data, id)); }
-function photoGet(id)       { return idbRun('readonly',  st => st.get(id)); }
-function photoDel(id)       { return idbRun('readwrite', st => st.delete(id)); }
-function photoKeys()        { return idbRun('readonly',  st => st.getAllKeys()); }
-
-/* 記録に残っていない写真と、古すぎる写真を片づける */
-async function prunePhotos() {
-  const keys = await photoKeys();
-  if (!keys || !keys.length) return;
-  const alive = new Set(history.filter(x => x.pid).map(x => x.pid));
-  for (const k of keys) if (!alive.has(k)) await photoDel(k);
-  const ordered = history.filter(x => x.pid).map(x => x.pid);
-  for (const id of ordered.slice(PHOTO_MAX)) await photoDel(id);
-}
-
-/* =========================================================
-   3-b. 運転台の演出
+   3. 運転台の演出
    --spd(車窓の周期) と --kmh(速度計) を :root に書くだけで、
    見た目はすべてCSS側で追従する。抽選ロジックには手を入れない。
    ========================================================= */
@@ -1023,6 +944,8 @@ let activeReel = 0;   /* いま確定させようとしている表示器 */
 /* 止める順番。番号そのものは変えず「押す順」だけを決める
    0=行き先(車窓) → 2=ごほうび(LED) → 1=指令 → 3=だれ */
 const BRAKE_ORDER = [0, 2, 1, 3];
+/* 伏せているあいだの表示。回っていないことが一目でわかる形にする */
+const REEL_COVER = '- - -';
 function nextRunningReel() {
   for (const i of BRAKE_ORDER) if (isRunning[i]) return i;
   return -1;
@@ -1284,66 +1207,6 @@ function cabStop() {
   drawCab(0);
 }
 
-/* ---- 達成の写真（任意） ----
-   撮れない場面（雨・混雑・電池切れ）で達成できなくなると本末転倒なので、
-   写真は「撮ってもよい」ものに留める。押した人だけカメラが開く。 */
-let pendingPhoto = null;
-
-function updatePhotoBtn() {
-  const b = document.getElementById('photo-btn');
-  if (!b) return;
-  b.disabled = !currentResult.station || runningCount() > 0;
-}
-function pickPhoto() {
-  const el = document.getElementById('photo-input');
-  if (el) { el.value = ''; el.click(); }
-}
-function dropPhoto() {
-  pendingPhoto = null;
-  const row = document.getElementById('photo-row');
-  const img = document.getElementById('photo-preview');
-  if (row) row.classList.remove('has-photo');
-  if (img) img.removeAttribute('src');
-}
-/* 長辺800pxまで縮めてJPEGにする。原寸のままだと端末の容量をすぐ食う */
-function shrinkImage(file, maxSide) {
-  return new Promise(resolve => {
-    try {
-      const fr = new FileReader();
-      fr.onload = () => {
-        const im = new Image();
-        im.onload = () => {
-          try {
-            const s = Math.min(1, maxSide / Math.max(im.width, im.height));
-            const cv = document.createElement('canvas');
-            cv.width = Math.max(1, Math.round(im.width * s));
-            cv.height = Math.max(1, Math.round(im.height * s));
-            const cx = cv.getContext('2d');
-            if (!cx) return resolve(String(fr.result));
-            cx.drawImage(im, 0, 0, cv.width, cv.height);
-            resolve(cv.toDataURL('image/jpeg', 0.7));
-          } catch (e) { resolve(String(fr.result)); }
-        };
-        im.onerror = () => resolve(null);
-        im.src = String(fr.result);
-      };
-      fr.onerror = () => resolve(null);
-      fr.readAsDataURL(file);
-    } catch (e) { resolve(null); }
-  });
-}
-async function onPhotoPicked(input) {
-  const f = input && input.files && input.files[0];
-  if (!f) return;
-  const data = await shrinkImage(f, 800);
-  if (!data) { alert('しゃしんを よみこめませんでした。'); return; }
-  pendingPhoto = data;
-  const row = document.getElementById('photo-row');
-  const img = document.getElementById('photo-preview');
-  if (img) img.src = data;
-  if (row) row.classList.add('has-photo');
-}
-
 /* 行き先は車窓の中の1か所だけ。
    走行中は小さく半透明（景色を隠さない）、確定したら白い駅名標になる */
 function setDestSpinning() {
@@ -1386,7 +1249,6 @@ function updateReelFocus() {
   if (label) label.textContent = anyRunning
     ? `ブレーキ\n${REEL_NAMES[activeReel]}`
     : 'ブレーキ';
-  updatePhotoBtn();
 }
 
 /* 大きなブレーキ1本で、いまの表示器を止める */
@@ -1520,6 +1382,33 @@ function getFairMission() {
   return missionBag.pop();
 }
 
+/* stopReel から次の表示器を回しはじめるときに使う駅の候補 */
+let spinAvail = [];
+
+/* いま順番が来た表示器だけを回す。
+   4つ同時だと目が疲れる（実機のフィードバック）ので、
+   回るのは常に1つ、ブレーキが向いている先だけにする */
+function spinReel(i, avail) {
+  if (!isRunning[i] || intervals[i]) return;
+  const box = document.getElementById(`reel-${i}`);
+  if (box) box.classList.remove('pending');
+  if (i === 0) setDestSpinning();
+  intervals[i] = setInterval(() => {
+    if (i===0) box.innerText = avail[Math.floor(Math.random()*avail.length)].name;
+    if (i===1) box.innerText = settings.missions[Math.floor(Math.random()*settings.missions.length)];
+    if (i===2) { const t = rewardTable(); box.innerText = t[Math.floor(Math.random()*t.length)].label; }
+    if (i===3) box.innerText = settings.targets[Math.floor(Math.random()*settings.targets.length)].label;
+  }, 50);
+}
+/* まだ順番が来ていない表示器を伏せる */
+function coverReel(i) {
+  const box = document.getElementById(`reel-${i}`);
+  if (!box) return;
+  box.innerText = REEL_COVER;
+  box.classList.add('pending');
+  box.style.textShadow = '';
+}
+
 function startAll() {
   /* 回数を使い切った状態で開くと、ボタンは普通の見た目のまま何も起きなかった。
      黙って return せず、理由と直し方を伝える */
@@ -1539,25 +1428,22 @@ function startAll() {
 
   /* 発車 */
   clearBtnReset();
-  dropPhoto();
-  setDestSpinning();
   pickScene();
   activeReel = BRAKE_ORDER[0];
   departSound();
   setCab('accel');
   setTimeout(() => { if (cabState === 'accel') setCab('cruise'); }, 600);
 
+  /* 4つとも「まだ決まっていない」状態にはするが、回すのは先頭の1つだけ。
+     残りは伏せておき、ブレーキが向いた瞬間にはじめて回りだす */
+  spinAvail = avail;
   for (let i=0;i<4;i++) {
     isRunning[i] = true;
+    intervals[i] = null;
     document.getElementById(`stop-${i}`).disabled = false;
-    intervals[i] = setInterval(() => {
-      const box = document.getElementById(`reel-${i}`);
-      if (i===0) box.innerText = avail[Math.floor(Math.random()*avail.length)].name;
-      if (i===1) box.innerText = settings.missions[Math.floor(Math.random()*settings.missions.length)];
-      if (i===2) { const t = rewardTable(); box.innerText = t[Math.floor(Math.random()*t.length)].label; }
-      if (i===3) box.innerText = settings.targets[Math.floor(Math.random()*settings.targets.length)].label;
-    }, 50);
+    coverReel(i);
   }
+  spinReel(activeReel, avail);
   updateReelFocus();
   updateStartBtn();
 }
@@ -1565,21 +1451,24 @@ function startAll() {
 function stopReel(index) {
   if (!isRunning[index]) return;
   clearInterval(intervals[index]);
+  intervals[index] = null;
   isRunning[index] = false;
   document.getElementById(`stop-${index}`).disabled = true;
   brakeSound();
   setCab(runningCount() > 0 ? 'braking' : 'arriving');
-  /* 次に止める表示器へ進める */
+  /* 次に止める表示器へ進め、そこではじめて回しはじめる */
   const nx = nextRunningReel();
   activeReel = nx >= 0 ? nx : index;
+  if (nx >= 0) spinReel(nx, spinAvail.length ? spinAvail : getCandidates());
   updateReelFocus();
 
   const box = document.getElementById(`reel-${index}`);
+  box.classList.remove('pending');
   if (index === 0) {
     const avail = getCandidates();
     const st = avail[Math.floor(Math.random()*avail.length)];
     currentResult.station = st.name; lastStation = st.name;
-    box.textContent = st.name;
+    box.innerText = st.name;      /* 他の表示器と書き方をそろえる */
     setDestFixed(st);
   }
   if (index === 1) { box.innerText = getFairMission(); currentResult.mission = box.innerText; }
@@ -1651,6 +1540,7 @@ function clearMission() {
   totalMoney += rewardValue(currentResult.money);
   store.totalMoney = totalMoney; saveStore();
 
+  /* id は表示には使っていないが、記録1件を一意に指せるようにしておく */
   const entry = {
     id: 'h' + Date.now() + Math.random().toString(36).slice(2, 6),
     station: currentResult.station, mission: currentResult.mission,
@@ -1658,14 +1548,7 @@ function clearMission() {
     date: todayKey(), mode: rewardMode(),
     time: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})
   };
-  /* 写真は撮っていれば紐づける。保存に失敗しても記録自体は残す */
-  if (pendingPhoto) {
-    entry.pid = entry.id;
-    const data = pendingPhoto;
-    photoPut(entry.id, data).then(() => prunePhotos()).catch(() => {});
-  }
   history.unshift(entry);
-  dropPhoto();
   store.history = history; saveStore();
   renderHistory(); updateHeader();
   document.getElementById('clear-btn').style.display = 'none';
@@ -1755,23 +1638,10 @@ function renderHistory() {
   const list = document.getElementById('history-list');
   if (history.length === 0) { list.innerHTML = "まだ記録がありません"; return; }
   list.innerHTML = history.map(h =>
-    `<div class="history-item" data-pid="${esc(h.pid || '')}">` +
+    `<div class="history-item">` +
     `<span class="stamp">⭐</span> ${esc(h.time)} 【${esc(h.station)}】${esc(h.mission)}` +
     `<br>→ ${esc(h.target)} に ${esc(h.money)}</div>`
   ).join('');
-  /* 写真は非同期に読み込んで後から差し込む（一覧の表示を待たせない） */
-  for (const el of list.querySelectorAll('.history-item[data-pid]')) {
-    const pid = el.getAttribute('data-pid');
-    if (!pid) continue;
-    photoGet(pid).then(data => {
-      if (!data) return;
-      const img = document.createElement('img');
-      img.className = 'hphoto';
-      img.alt = 'とった写真';
-      img.src = data;
-      el.insertBefore(img, el.firstChild);
-    }).catch(() => {});
-  }
 }
 function renderExcluded() {
   const box = document.getElementById('excluded-list');
@@ -1835,7 +1705,9 @@ const TABS = ['play','log','set'];
 
 function switchTab(name) {
   if (name === 'set' && !parentAuthed) {
-    const pin = prompt("🔐 保護者のあいことば(PIN)を入力してください");
+    const pin = prompt(isDefaultPin()
+      ? "🔐 保護者のあいことば(PIN)を入力してください\n\nはじめは「1234」です。\n（せってい の中でいつでも変更できます）"
+      : "🔐 保護者のあいことば(PIN)を入力してください");
     if (pin === null) return;
     if (pin !== getPin()) { alert("あいことばが違います"); return; }
     parentAuthed = true;
@@ -2038,7 +1910,6 @@ function clearHistory(){
   if (confirm("今日の記録と合計金額をすべて消しますか?")) {
     history = []; totalMoney = 0;
     store.history = history; store.totalMoney = totalMoney; saveStore();
-    prunePhotos();                 /* 記録から消えた写真も端末から消す */
     renderHistory(); updateHeader();
   }
 }
