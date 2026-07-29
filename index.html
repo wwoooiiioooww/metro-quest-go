@@ -100,15 +100,7 @@
     position:absolute; top:6px; left:8px; z-index:5; font-size:0.62em; font-weight:bold;
     background:rgba(0,0,0,.45); color:#fff; padding:2px 8px; border-radius:10px;
   }
-  /* 雨 */
-  .rain { position:absolute; inset:-20%; opacity:0; pointer-events:none; }
-  #cab-view.sc-rain .rain {
-    opacity:.55;
-    background-image:repeating-linear-gradient(74deg,
-      rgba(255,255,255,.75) 0 1px, transparent 1px 9px);
-    animation:rainfall .38s linear infinite;
-  }
-  @keyframes rainfall { to { background-position:22px 120px; } }
+
   /* お地蔵さん */
   #jizo {
     position:absolute; z-index:6; left:100%; top:38%; font-size:2.6em; opacity:0;
@@ -124,29 +116,46 @@
   }
 
   /* ---- 🚇 ちかてつ ---- */
-  #cab-view.sc-under { background:linear-gradient(#0b1224, #05070f); }
+  #cab-view.sc-under   { background:linear-gradient(#0d1730, #060a16); }
+  #cab-view.sc-morning { background:linear-gradient(#ffb877, #ffe2b4 40%, #c8e7ff); }
+  #cab-view.sc-day     { background:linear-gradient(#2f9ae6, #79c5f2 50%, #cfeaff); }
+  #cab-view.sc-night   { background:linear-gradient(#05081a, #0c1734 50%, #1d2c56); }
 
   /* ---- ☀️ はれ ---- */
-  #cab-view.sc-sky { background:linear-gradient(#5fb6ef 0%, #a9dcff 55%, #d9f0ff 100%); }
+
 
   /* ---- ☔ あめ ---- */
-  #cab-view.sc-rain { background:linear-gradient(#5d6b7d 0%, #8e9cad 60%, #b3bec9 100%); }
+
 
   /* ---- 🌆 ゆうやけ ---- */
-  #cab-view.sc-dusk { background:linear-gradient(#ff9950 0%, #f2685f 45%, #6d4a9c 100%); }
+  #cab-view.sc-dusk    { background:linear-gradient(#ff8a3d, #ff6b5c 45%, #553a86); }
   /* 車窓の本体。一点透視の描画はJS側(drawCab)が行う */
   #cab-canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
   /* 奥の光点（トンネルの出口）。減速すると大きくなる */
 
-  /* 到着時にせり上がる駅名標 */
-  #station-sign {
-    position:absolute; left:50%; bottom:14px; transform:translate(-50%, 60px);
-    background:#f8f8f8; color:#111; font-weight:bold; font-size:1.15em;
-    padding:7px 22px; border-radius:6px; border:3px solid #1b4a9c;
-    opacity:0; transition:transform .55s cubic-bezier(.2,.9,.3,1.2), opacity .4s;
-    white-space:nowrap; max-width:88%; overflow:hidden; text-overflow:ellipsis;
+  /* 行き先パネル。景色を隠さないよう、走行中は小さく半透明にして下に置く */
+  #dest-panel {
+    position:absolute; left:50%; bottom:10px; transform:translateX(-50%);
+    z-index:4; width:86%; max-width:300px; text-align:center;
+    background:rgba(8,12,24,.55); border:2px solid rgba(255,255,255,.28);
+    border-radius:10px; padding:5px 10px 6px;
+    transition:background .4s, border-color .4s, padding .4s, bottom .45s cubic-bezier(.2,.9,.3,1.2);
   }
-  #station-sign.on { transform:translate(-50%, 0); opacity:1; }
+  #dest-panel.fixed {
+    bottom:16px; background:rgba(248,248,248,.96); border-color:#1b4a9c; padding:7px 10px 8px;
+  }
+  .dp-label { font-size:0.58em; letter-spacing:2px; color:rgba(255,255,255,.8); }
+  #dest-panel.fixed .dp-label { color:#3a5a8a; }
+  .dp-name {
+    font-size:1.15em; font-weight:bold; color:#fff; line-height:1.15;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    text-shadow:0 1px 4px rgba(0,0,0,.7); transition:font-size .35s, color .35s;
+  }
+  #dest-panel.fixed .dp-name { font-size:1.5em; color:#111; text-shadow:none; }
+  .dp-lines { display:flex; gap:3px; flex-wrap:wrap; justify-content:center; margin-top:3px; }
+  .dp-lines:empty { display:none; }
+  #dest-panel.active { border-color:var(--cyan); box-shadow:0 0 12px rgba(0,210,211,.45); }
+  #reward-board.active { border-color:var(--cyan); box-shadow:0 0 10px rgba(0,210,211,.35); }
 
   /* ---- 運転台 ---- */
   #cab-console {
@@ -155,18 +164,18 @@
     box-shadow:inset 0 0 14px #000;
   }
   .console-top { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
-  /* LED方向幕 */
-  #dest-board {
+  /* ごほうびのLED表示器 */
+  #reward-board {
     flex-grow:1; min-width:0; background:#080d06; border-radius:6px;
-    border:2px solid #0f3460; padding:8px 10px; text-align:left; overflow:hidden;
+    border:2px solid #0f3460; padding:7px 10px; text-align:left; overflow:hidden;
     background-image:radial-gradient(rgba(0,0,0,.55) 32%, transparent 33%);
-    background-size:3px 3px;
+    background-size:3px 3px; position:relative;
   }
   .dest-label { color:#4f8f3a; font-size:0.62em; letter-spacing:2px; display:block; }
-  #dest-text {
-    color:#7CFC55; font-size:1.05em; font-weight:bold; letter-spacing:2px;
+  #reward-board .reel-box {
+    color:#7CFC55; font-size:1.15em; font-weight:bold; letter-spacing:1px;
     text-shadow:0 0 8px rgba(124,252,85,.6); white-space:nowrap;
-    display:block; overflow:hidden; text-overflow:ellipsis;
+    display:block; height:auto; background:none; overflow:hidden; text-overflow:ellipsis;
   }
   /* 速度計 */
   #speedo {
@@ -189,24 +198,14 @@
   #speedo .kmh { position:relative; z-index:2; font-size:0.5em; color:var(--grey); }
 
   /* ---- 表示器（順番に1つずつ確定していく） ---- */
-  /* 確定するたびに行が増えてブレーキの位置が下へズレるため、高さを固定する */
-  .slot-container { display:flex; flex-direction:column; gap:5px; min-height:172px; }
+  .slot-container { display:flex; flex-direction:column; gap:6px; }
   .reel-row {
     display:flex; align-items:center; gap:7px;
     background:#0b1020; border:2px solid #0f3460; border-radius:8px; padding:6px;
   }
-  /* まだ順番が来ていない項目は出さない（画面を縦に伸ばさないため） */
-  .reel-row.pending { display:none; }
-  /* 確定済みは1行に畳む */
-  .reel-row.done { padding:3px 7px; background:#0a1526; border-color:#12283f; }
-  .reel-row.done .reel-box {
-    height:auto; font-size:0.78em; padding:2px 0; background:none; text-shadow:none;
-    flex-direction:row; gap:5px; flex-wrap:wrap; color:#9fd8ff;
-  }
-  .reel-row.done .reel-label { writing-mode:horizontal-tb; font-size:0.6em; }
-  .reel-row.done .line-chips { margin-top:0; }
-  .reel-row.done .stop-btn { display:none; }
-  .reel-row.active .reel-box { height:56px; font-size:1.1em; }
+  /* いま回している段を光らせる。位置は固定したまま（ブレーキがズレないように） */
+  .reel-row.active { border-color:var(--cyan); box-shadow:0 0 10px rgba(0,210,211,.35); }
+  .reel-row.done .reel-box { color:#9fd8ff; }
   .reel-label {
     font-size:0.62em; color:var(--grey); writing-mode:vertical-rl; text-orientation:upright;
     letter-spacing:1px; flex-shrink:0;
@@ -252,16 +251,7 @@
   #start-btn:active { transform:translateY(5px); box-shadow:0 0 var(--orange); }
   #start-btn:disabled { background:#6d757b; box-shadow:0 5px #4a5054; color:#e2e6e8; }
   #clear-btn { margin-top:9px; padding:11px 20px; }
-  /* 計器のとなりの小さなスイッチ。抽選には一切関与しない */
-  #switches { display:flex; flex-direction:column; gap:5px; flex-shrink:0; }
-  #switches button {
-    width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:0.95em; padding:0;
-    background:linear-gradient(180deg,#3d4e69,#22304a); color:#fff;
-    border:2px solid #55688a; box-shadow:0 3px #16203a; transition:transform .1s, box-shadow .1s;
-  }
-  #switches button:active { transform:translateY(3px); box-shadow:0 0 #16203a; }
-  #horn-btn { background:linear-gradient(180deg,#8a5230,#4a2c18) !important; border-color:#a8734c !important; }
-  #switches button:disabled { background:#2a3244 !important; border-color:#3a4358 !important; opacity:.5; box-shadow:0 3px #1a2030; }
+
   #start-btn:active { transform:translateY(5px); box-shadow:0 0 var(--orange); }
   #start-btn:disabled { background-color:#7f8c8d; box-shadow:0 5px #555; color:#ccc; }
   #clear-btn {
@@ -364,7 +354,7 @@
 
   /* 演出OFF: 動きを止める。機能はすべて使えるままにする */
   body.no-motion #speedo .needle,
-  body.no-motion #station-sign,
+  body.no-motion #dest-panel,
   body.no-motion #cab-view::after { transition:none; }
   body.no-motion .sp-train, body.no-motion .sp-rail { animation:none; }
 
@@ -445,22 +435,24 @@
   <!-- 前面展望。壁と照明が奥から手前へ流れる -->
   <div id="cab-view" class="stopped">
     <canvas id="cab-canvas"></canvas>
-    <div class="rain"></div>
     <div id="jizo">🗿</div>
     <div id="scene-tag">🚇 ちかてつ</div>
-    <div id="station-sign"></div>
+    <!-- 行き先はここ1か所だけ。走行中は小さく、確定したらせり上がって大きくなる -->
+    <div id="dest-panel">
+      <div class="dp-label" id="dp-label">つぎは</div>
+      <div class="dp-name reel-box" id="reel-0">---</div>
+      <div class="dp-lines" id="dest-lines"></div>
+    </div>
+    <button class="stop-btn" id="stop-0" onclick="stopReel(0)" disabled>ブレーキ</button>
   </div>
 
   <!-- 運転台 -->
   <div id="cab-console">
     <div class="console-top">
-      <div id="dest-board">
-        <span class="dest-label">つぎは</span>
-        <span id="dest-text">＿＿＿＿</span>
-      </div>
-      <div id="switches">
-        <button id="horn-btn" onclick="pressHorn()" title="けいてき">🔔</button>
-        <button id="door-btn" onclick="pressDoor()" disabled title="ドアかいへい">🚪</button>
+      <div id="reward-board">
+        <span class="dest-label" id="reel-label-2">スタンプ</span>
+        <span class="reel-box" id="reel-2">---</span>
+        <button class="stop-btn" id="stop-2" onclick="stopReel(2)" disabled>ブレーキ</button>
       </div>
       <div id="speedo">
         <div class="needle"></div>
@@ -471,24 +463,14 @@
 
     <div class="slot-container">
       <div class="reel-row">
-        <div class="reel-label">行き先</div>
-        <div class="reel-box" id="reel-0">---</div>
-        <button class="stop-btn" id="stop-0" onclick="stopReel(0)" disabled><span class="knob"></span>ブレーキ</button>
-      </div>
-      <div class="reel-row">
         <div class="reel-label">指令</div>
         <div class="reel-box" id="reel-1">---</div>
-        <button class="stop-btn" id="stop-1" onclick="stopReel(1)" disabled><span class="knob"></span>ブレーキ</button>
+        <button class="stop-btn" id="stop-1" onclick="stopReel(1)" disabled>ブレーキ</button>
       </div>
       <div class="reel-row">
-        <div class="reel-label" id="reel-label-2">スタンプ</div>
-        <div class="reel-box" id="reel-2" style="color:#f1c40f;">---</div>
-        <button class="stop-btn" id="stop-2" onclick="stopReel(2)" disabled><span class="knob"></span>ブレーキ</button>
-      </div>
-      <div class="reel-row">
-        <div class="reel-label">対象者</div>
+        <div class="reel-label">だれ</div>
         <div class="reel-box" id="reel-3" style="color:#00d2d3;">---</div>
-        <button class="stop-btn" id="stop-3" onclick="stopReel(3)" disabled><span class="knob"></span>ブレーキ</button>
+        <button class="stop-btn" id="stop-3" onclick="stopReel(3)" disabled>ブレーキ</button>
       </div>
     </div>
   </div>
@@ -839,7 +821,7 @@ function rewardValue(label) {
      同一オリジンに家族版の旧キーが残っている可能性があり、
      拾うと他アプリのデータを取り込んでしまうため。
    ========================================================= */
-const APP_VER = 'v10';
+const APP_VER = 'v11';
 const APP_KEY = 'mqgo_v1';
 
 /* totalMoney: ごほうびの累計。stampモードでは「こ」、moneyモードでは「円」。
@@ -912,27 +894,52 @@ function getPin() { return store.pin || "1234"; }
    ========================================================= */
 let cabState = 'stopped';
 let activeReel = 0;   /* いま確定させようとしている表示器 */
+/* 止める順番。番号そのものは変えず「押す順」だけを決める
+   0=行き先(車窓) → 2=ごほうび(LED) → 1=指令 → 3=だれ */
+const BRAKE_ORDER = [0, 2, 1, 3];
+function nextRunningReel() {
+  for (const i of BRAKE_ORDER) if (isRunning[i]) return i;
+  return -1;
+}
 
 /* 景色。地下だけだと暗くて見えないので、乗るたびに変わるようにした */
-/* canvasで描くための色。sky=空のグラデ / ground=地面 / rail=線路
+/* 景色は「いまの時刻」で決まる。画面が勝手に暗くなることで、
+   保護者が「そろそろ帰ろう」と言いやすくなる（これが主目的）。
+   sky=空のグラデ(2〜4色) / ground=地面 / rail=線路 /
    kinds=脇を通り過ぎるもの(pole 電柱 / tree 木 / bldg ビル / lamp 天井灯) */
 const SCENES = [
-  { cls:'sc-under', tag:'🚇 ちかてつ',
+  { key:'morning', cls:'sc-morning', tag:'🌅 あさ',
+    sky:['#ffb877','#ffe2b4','#c8e7ff','#e4f4ff'], ground:'#7ba85e', rail:'#9a8f7d',
+    body:'#4a8f42', accent:'#fff6dc', kinds:['tree','pole','bldg'] },
+  { key:'day', cls:'sc-day', tag:'☀️ ひる',
+    sky:['#2f9ae6','#79c5f2','#cfeaff'], ground:'#6fa855', rail:'#9a8f7d',
+    body:'#3f8339', accent:'#ece6d8', kinds:['tree','pole','bldg'] },
+  { key:'dusk', cls:'sc-dusk', tag:'🌆 ゆうがた',
+    sky:['#ff8a3d','#ff6b5c','#a05a9c','#553a86'], ground:'#4a4060', rail:'#6b6076',
+    body:'#2e2444', accent:'#ffd98a', kinds:['bldg','pole','tree'] },
+  { key:'night', cls:'sc-night', tag:'🌙 よる',
+    sky:['#05081a','#0c1734','#1d2c56'], ground:'#101828', rail:'#3d4a68',
+    body:'#141d33', accent:'#ffe9a8', kinds:['bldg','pole'], stars:true },
+  { key:'under', cls:'sc-under', tag:'🚇 ちかてつ',
     sky:['#0d1730','#060a16'], ground:'#151d33', rail:'#4a5a7e',
-    body:'#33456e', accent:'#ffe9b0', kinds:['lamp','pole'] },
-  { cls:'sc-sky', tag:'☀️ はれ',
-    sky:['#59b2ee','#cfeaff'], ground:'#6fa855', rail:'#9a8f7d',
-    body:'#3f8339', accent:'#d8d2c4', kinds:['tree','pole','bldg'] },
-  { cls:'sc-rain', tag:'☔ あめ',
-    sky:['#5d6b7d','#aab5c1'], ground:'#5d7355', rail:'#77808a',
-    body:'#33443a', accent:'#b9c3cd', kinds:['tree','pole'] },
-  { cls:'sc-dusk', tag:'🌆 ゆうやけ',
-    sky:['#ff9950','#6d4a9c'], ground:'#3c3450', rail:'#6b6076',
-    body:'#241d36', accent:'#ffd98a', kinds:['bldg','pole'] }
+    body:'#33456e', accent:'#ffe9b0', kinds:['lamp','pole'] }
 ];
-let curScene = SCENES[0];
+
+/* 時刻 → 景色。境目は 5時 / 9時 / 16時 / 18時半 */
+function sceneKeyByClock(now) {
+  const t = now || new Date();
+  const hm = t.getHours() + t.getMinutes() / 60;
+  if (hm >= 5   && hm < 9)    return 'morning';
+  if (hm >= 9   && hm < 16)   return 'day';
+  if (hm >= 16  && hm < 18.5) return 'dusk';
+  return 'night';
+}
+function sceneByKey(key) { return SCENES.find(s => s.key === key) || SCENES[1]; }
+let curScene = SCENES[1];
 function pickScene() {
-  curScene = SCENES[Math.floor(Math.random() * SCENES.length)];
+  /* 地下鉄なので、3回に1回くらいはトンネルを走る */
+  const key = Math.random() < 0.33 ? 'under' : sceneKeyByClock();
+  curScene = sceneByKey(key);
   const tag = document.getElementById('scene-tag');
   if (tag) tag.textContent = curScene.tag;
   if (CAB.ctx) { cabSeed(); drawCab(0); }
@@ -980,7 +987,7 @@ function setCab(state) {
    これだけで「奥から手前へ流れてくる」絵になる。
    ※画像素材は使わず、すべて図形で描く
    ========================================================= */
-const CAB = { cv:null, ctx:null, w:0, h:0, dpr:1, objs:[], raf:0, last:0, dist:0 };
+const CAB = { cv:null, ctx:null, w:0, h:0, dpr:1, objs:[], stars:[], raf:0, last:0, dist:0 };
 const FOCAL = 260;      /* 焦点距離。大きいほど望遠 */
 const Z_NEAR = 12;      /* これより手前に来たら奥へ戻す */
 const Z_FAR  = 620;
@@ -1040,10 +1047,25 @@ function drawCab(dt) {
   const speed = motionOn() ? kmh * 1.15 : 0;
   CAB.dist += speed * dt;
 
-  /* 空 */
+  /* 空。色は2〜4色を等間隔に置く */
   const g = c.createLinearGradient(0, 0, 0, horizon);
-  g.addColorStop(0, sc.sky[0]); g.addColorStop(1, sc.sky[1]);
+  sc.sky.forEach((col, i) => g.addColorStop(sc.sky.length < 2 ? 0 : i / (sc.sky.length - 1), col));
   c.fillStyle = g; c.fillRect(0, 0, W, horizon + 1);
+  /* 夜は星。毎フレーム位置を変えるとチカチカするので、明るさも固定しておく */
+  if (sc.stars) {
+    if (!CAB.stars.length) {
+      for (let i = 0; i < 44; i++) {
+        CAB.stars.push({ x:Math.random(), y:Math.random() * 0.82,
+                         r:Math.random() * 1.1 + 0.4, a:Math.random() * 0.55 + 0.4 });
+      }
+    }
+    c.fillStyle = '#ffffff';
+    for (const s of CAB.stars) {
+      c.globalAlpha = s.a;
+      c.beginPath(); c.arc(s.x * W, s.y * horizon, s.r, 0, Math.PI * 2); c.fill();
+    }
+    c.globalAlpha = 1;
+  }
   /* 地面 */
   c.fillStyle = sc.ground; c.fillRect(0, horizon, W, H - horizon);
   /* 消失点の光 */
@@ -1136,39 +1158,45 @@ function cabStop() {
   drawCab(0);
 }
 
-function setDest(text) {
-  const el = document.getElementById('dest-text');
-  if (el) el.textContent = text;
+/* 行き先は車窓の中の1か所だけ。
+   走行中は小さく半透明（景色を隠さない）、確定したら白い駅名標になる */
+function setDestSpinning() {
+  const p = document.getElementById('dest-panel');
+  const l = document.getElementById('dp-label');
+  const li = document.getElementById('dest-lines');
+  if (p) p.classList.remove('fixed');
+  if (l) l.textContent = 'つぎは';
+  if (li) li.innerHTML = '';
 }
-function showStationSign(name) {
-  const sign = document.getElementById('station-sign');
-  if (!sign) return;
-  sign.textContent = name;
-  sign.classList.add('on');
-}
-function hideStationSign() {
-  const sign = document.getElementById('station-sign');
-  if (sign) sign.classList.remove('on');
+function setDestFixed(st) {
+  const l = document.getElementById('dp-label');
+  const li = document.getElementById('dest-lines');
+  const p = document.getElementById('dest-panel');
+  if (l) l.textContent = 'とうちゃく';
+  if (li) li.innerHTML = st.lines
+    .map(x => `<span class="lc" style="background:${LINES[x].c}">${esc(LINES[x].n)}</span>`).join('');
+  if (p) p.classList.add('fixed');
 }
 
-/* 表示器の出し分け。確定済みは畳み、これからの分は隠す */
+/* いま回している段を光らせる。位置はすべて固定で、隠したり畳んだりしない
+   （行き先=車窓 / ごほうび=LED / 指令・だれ=下の2行） */
 const REEL_NAMES = ['行き先','指令','ごほうび','だれ'];
 function updateReelFocus() {
-  for (let i = 0; i < 4; i++) {
+  for (const i of [1, 3]) {
     const row = document.getElementById(`reel-${i}`).closest('.reel-row');
     if (!row) continue;
-    row.classList.remove('pending','active','done');
-    if (isRunning[i] && i === activeReel) row.classList.add('active');
-    else if (isRunning[i]) row.classList.add('pending');
-    else row.classList.add('done');
+    row.classList.toggle('active', isRunning[i] && i === activeReel);
+    row.classList.toggle('done', !isRunning[i]);
   }
+  const dp = document.getElementById('dest-panel');
+  if (dp) dp.classList.toggle('active', !!isRunning[0] && activeReel === 0);
+  const rb = document.getElementById('reward-board');
+  if (rb) rb.classList.toggle('active', !!isRunning[2] && activeReel === 2);
+
   const brake = document.getElementById('brake-btn');
   const label = document.getElementById('brake-label');
   const anyRunning = runningCount() > 0;
   if (brake) brake.disabled = !anyRunning;
-  /* ドアは停車していて、かつ行き先が決まっているときだけ開けられる */
-  const door = document.getElementById('door-btn');
-  if (door) door.disabled = anyRunning || !currentResult.station;
   if (label) label.textContent = anyRunning
     ? `ブレーキ\n${REEL_NAMES[activeReel]}`
     : 'ブレーキ';
@@ -1177,7 +1205,7 @@ function updateReelFocus() {
 /* 大きなブレーキ1本で、いまの表示器を止める */
 function pullBrake() {
   if (!isRunning[activeReel]) {
-    const nx = isRunning.indexOf(true);
+    const nx = nextRunningReel();
     if (nx < 0) return;
     activeReel = nx;
   }
@@ -1256,28 +1284,6 @@ function stopRunSound() {
   try { if (runOsc) { runOsc.stop(); runOsc.disconnect(); } } catch(e){}
   runOsc = null;
 }
-/* 警笛。抽選には関与しない、押すと鳴るだけの操作 */
-function hornSound() {
-  beep(392, 0.42, 'sawtooth');
-  setTimeout(() => beep(523, 0.42, 'sawtooth'), 40);
-}
-function pressHorn() { unlockAudio(); hornSound(); }
-
-/* ドア開閉。到着後に押せる */
-function doorSound() {
-  [1046, 784].forEach((f,i) => setTimeout(() => beep(f, 0.2, 'sine'), i * 160));
-  setTimeout(() => beep(180, 0.5, 'sawtooth'), 380);
-}
-function pressDoor() {
-  unlockAudio(); doorSound();
-  const b = document.getElementById('bonus-msg');
-  if (b && b.style.display !== 'block') {
-    b.innerHTML = '🚪 ドアがひらきます。ごちゅういください。';
-    b.style.display = 'block';
-    setTimeout(() => { if (b.innerHTML.indexOf('ドアがひらきます') >= 0) b.style.display = 'none'; }, 2600);
-  }
-}
-
 function departSound(){ [880,1047].forEach((f,i)=>setTimeout(()=>beep(f,0.22,'triangle'),i*180)); }
 function brakeSound(){ beep(300,0.10,'square'); }
 function arriveSound(){ [784,659,523].forEach((f,i)=>setTimeout(()=>beep(f,0.18,'triangle'),i*130)); }
@@ -1335,10 +1341,9 @@ function startAll() {
   document.getElementById('bonus-msg').style.display = 'none';
 
   /* 発車 */
-  hideStationSign();
-  setDest('＿＿＿＿');
+  setDestSpinning();
   pickScene();
-  activeReel = 0;
+  activeReel = BRAKE_ORDER[0];
   departSound();
   setCab('accel');
   setTimeout(() => { if (cabState === 'accel') setCab('cruise'); }, 600);
@@ -1366,7 +1371,7 @@ function stopReel(index) {
   brakeSound();
   setCab(runningCount() > 0 ? 'braking' : 'arriving');
   /* 次に止める表示器へ進める */
-  const nx = isRunning.indexOf(true);
+  const nx = nextRunningReel();
   activeReel = nx >= 0 ? nx : index;
   updateReelFocus();
 
@@ -1375,9 +1380,8 @@ function stopReel(index) {
     const avail = getCandidates();
     const st = avail[Math.floor(Math.random()*avail.length)];
     currentResult.station = st.name; lastStation = st.name;
-    setDest(st.name);
-    box.innerHTML = `<div>${st.name}</div><div class="line-chips">` +
-      st.lines.map(l=>`<span class="lc" style="background:${LINES[l].c}">${LINES[l].n}</span>`).join('') + `</div>`;
+    box.textContent = st.name;
+    setDestFixed(st);
   }
   if (index === 1) { box.innerText = getFairMission(); currentResult.mission = box.innerText; }
   if (index === 2) { box.innerText = weightedPick(rewardTable()); currentResult.money = box.innerText; }
@@ -1395,7 +1399,6 @@ function checkAllStopped() {
     /* 到着。0.8秒かけて停車し、駅名標がせり上がる */
     setCab('arriving');
     arriveSound();
-    if (currentResult.station) showStationSign(currentResult.station);
     setTimeout(() => setCab('stopped'), 800);
     if (spinsLeft > 0) document.getElementById('start-btn').disabled = false;
     document.getElementById('clear-btn').style.display = 'inline-block';

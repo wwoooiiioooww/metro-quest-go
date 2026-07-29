@@ -721,9 +721,9 @@ console.log('\n[19] 運転台');
   w.eval('stopReel(3)');
   eq(w.eval('runningCount()'), 0, '全部止まった');
   eq(w.eval('cabState'), 'arriving', '全部止まると到着状態');
-  ok(w.document.getElementById('station-sign').classList.contains('on'), '駅名標がせり上がる');
-  ok(w.document.getElementById('station-sign').textContent.length > 0, '駅名標に駅名が入る');
-  ok(w.document.getElementById('dest-text').textContent.length > 0, '方向幕に行き先が出る');
+  ok(w.document.getElementById('dest-panel').classList.contains('fixed'), '行き先パネルが確定表示になる');
+  ok(w.document.getElementById('reel-0').textContent.length > 0, '車窓に行き先が出ている');
+  ok(w.document.getElementById('dest-lines').children.length > 0, '路線カラーバッジが出る');
 
   await sleep(900);
   eq(w.eval('cabState'), 'stopped', '0.8秒後に停車へ戻る(遷移が閉じている)');
@@ -822,88 +822,119 @@ console.log('\n[22] idの回帰防止');
 }
 
 
-/* ---------- 23. 景色 ---------- */
+/* ---------- 23. 景色（時刻連動） ---------- */
 console.log('\n[23] 景色');
 {
   const { w, errors } = boot();
   const scenes = w.eval('SCENES');
-  eq(scenes.length, 4, '景色は4種類');
-  ok(scenes.every(s => /^sc-/.test(s.cls) && s.tag.length > 0), '各景色にクラスとラベルがある');
-  ok(scenes.some(s => s.cls === 'sc-sky'), '青空がある');
-  ok(scenes.some(s => s.cls === 'sc-rain'), '雨がある');
-  ok(scenes.some(s => s.cls === 'sc-under'), '地下がある');
-
-  /* 景色ごとに描画色がそろっていること（暗くて見えない問題の再発防止） */
+  eq(scenes.length, 5, '景色は5種類（あさ/ひる/ゆうがた/よる/ちかてつ）');
+  for (const k of ['morning','day','dusk','night','under'])
+    ok(scenes.some(s => s.key === k), k + ' がある');
   for (const s of scenes) {
-    ok(Array.isArray(s.sky) && s.sky.length === 2, s.tag + ' の空の色が2色ある');
+    ok(Array.isArray(s.sky) && s.sky.length >= 2, s.tag + ' の空が2色以上ある');
     ok(/^#[0-9a-f]{6}$/i.test(s.ground), s.tag + ' の地面の色がある');
     ok(/^#[0-9a-f]{6}$/i.test(s.rail),   s.tag + ' の線路の色がある');
-    ok(Array.isArray(s.kinds) && s.kinds.length > 0, s.tag + ' に通り過ぎるものが定義されている');
-    ok(new RegExp('#cab-view\\.' + s.cls + ' \\{').test(html), s.tag + ' の背景色がCSS側にもある(canvas非対応時の保険)');
+    ok(Array.isArray(s.kinds) && s.kinds.length > 0, s.tag + ' に通り過ぎるものがある');
+    ok(new RegExp('#cab-view\\.' + s.cls + '\\s').test(html),
+       s.tag + ' の背景色がCSSにもある(canvas非対応時の保険)');
   }
+  ok(scenes.find(s => s.key === 'night').stars, '夜は星が出る');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }
 {
-  /* 発車のたびに景色が選び直される */
+  /* 時刻で景色が決まる。画面が勝手に暗くなることで
+     「そろそろ帰ろう」が言いやすくなる、というのが主目的 */
+  const { w, errors } = boot();
+  const at = (hh, mm) => w.eval(`sceneKeyByClock(new Date(2026,0,1,${hh},${mm || 0}))`);
+  eq(at(7),      'morning', '7時は あさ');
+  eq(at(12),     'day',     '12時は ひる');
+  eq(at(17),     'dusk',    '17時は ゆうがた');
+  eq(at(20),     'night',   '20時は よる');
+  eq(at(3),      'night',   '深夜3時も よる');
+  eq(at(4, 59),  'night',   '4時59分はまだ よる');
+  eq(at(5, 0),   'morning', '5時ちょうどで あさ');
+  eq(at(8, 59),  'morning', '8時59分はまだ あさ');
+  eq(at(9, 0),   'day',     '9時ちょうどで ひる');
+  eq(at(15, 59), 'day',     '15時59分はまだ ひる');
+  eq(at(16, 0),  'dusk',    '16時で ゆうがた');
+  eq(at(18, 29), 'dusk',    '18時29分はまだ ゆうがた');
+  eq(at(18, 30), 'night',   '18時半で よる');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 地下鉄なので、トンネルもときどき走る */
   const { w } = boot();
-  w.eval('hideSplash()'); w.eval('closeNotice()');
-  const seen = new Set();
-  for (let i = 0; i < 40; i++) { w.eval('pickScene()'); seen.add(w.eval('curScene.cls')); }
-  ok(seen.size >= 3, `乗るたびに景色が変わる (40回で${seen.size}種類)`);
+  const keys = new Set();
+  for (let i = 0; i < 80; i++) { w.eval('pickScene()'); keys.add(w.eval('curScene.key')); }
+  ok(keys.has('under'), 'トンネルもときどき走る');
+  ok(keys.size >= 2, '時刻の景色と地下が混ざる');
   ok(w.document.getElementById('scene-tag').textContent.length > 0, '景色のラベルが出る');
   w.close();
 }
 
-/* ---------- 24. ブレーキ1本で順番に止める ---------- */
-console.log('\n[24] ブレーキは1本');
+/* ---------- 24. ブレーキの順番と定位置 ---------- */
+console.log('\n[24] ブレーキ');
 {
   const { w, errors } = boot();
   w.eval('hideSplash()'); w.eval('closeNotice()');
-  const rowOf = i => w.document.getElementById('reel-' + i).closest('.reel-row');
-
-  ok(w.document.getElementById('brake-btn'), '大きなブレーキが1本ある');
-  eq(w.document.getElementById('brake-btn').disabled, true, '停車中は押せない');
+  const d = w.document;
+  eq(w.eval('BRAKE_ORDER').join(), '0,2,1,3', '駅 → ごほうび → 指令 → だれ の順');
+  eq(d.getElementById('brake-btn').disabled, true, '停車中は押せない');
 
   w.eval('startAll()');
-  eq(w.document.getElementById('brake-btn').disabled, false, '発車したら押せる');
-  eq(w.eval('activeReel'), 0, '最初は行き先から');
-  ok(rowOf(0).classList.contains('active'), '行き先だけが大きく出る');
-  ok(rowOf(1).classList.contains('pending'), 'まだの項目は隠れている(縦に伸びない)');
-  ok(rowOf(3).classList.contains('pending'), '4つ目も隠れている');
-  ok(w.document.getElementById('brake-label').textContent.includes('行き先'), '何を止めるのか分かる');
+  eq(w.eval('activeReel'), 0, '最初は行き先');
+  ok(d.getElementById('dest-panel').classList.contains('active'), '行き先パネルが光る');
+  ok(d.getElementById('brake-label').textContent.includes('行き先'), '何を止めるのか分かる');
 
   w.eval('pullBrake()');
-  eq(w.eval('activeReel'), 1, 'ブレーキで次の項目へ進む');
-  ok(rowOf(0).classList.contains('done'), '確定した項目は畳まれる');
-  ok(rowOf(1).classList.contains('active'), '次の項目が大きくなる');
-  ok(w.document.getElementById('brake-label').textContent.includes('指令'), 'ラベルも追従する');
+  eq(w.eval('activeReel'), 2, '次はごほうび');
+  ok(d.getElementById('reward-board').classList.contains('active'), 'ごほうびのLEDが光る');
+  ok(!d.getElementById('dest-panel').classList.contains('active'), '行き先はもう光らない');
+  ok(d.getElementById('brake-label').textContent.includes('ごほうび'), 'ラベルが追従する');
 
-  w.eval('pullBrake()'); w.eval('pullBrake()'); w.eval('pullBrake()');
+  w.eval('pullBrake()');
+  eq(w.eval('activeReel'), 1, '次は指令');
+  ok(d.getElementById('reel-1').closest('.reel-row').classList.contains('active'), '指令の段が光る');
+
+  w.eval('pullBrake()');
+  eq(w.eval('activeReel'), 3, '最後はだれ');
+  ok(d.getElementById('reel-3').closest('.reel-row').classList.contains('active'), 'だれの段が光る');
+
+  w.eval('pullBrake()');
   eq(w.eval('runningCount()'), 0, '4回で全部止まる');
-  eq(w.document.getElementById('brake-btn').disabled, true, '止まったら押せない');
-  for (let i = 0; i < 4; i++) ok(rowOf(i).classList.contains('done'), `最後は${i}番も畳まれる`);
+  eq(d.getElementById('brake-btn').disabled, true, '止まったら押せない');
   ok(w.eval('currentResult.station').length > 0, '行き先が決まっている');
   ok(w.eval('currentResult.target').length > 0, 'だれが決まっている');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }
 {
-  /* 個別のブレーキは隠したがidは残っている（既存テストと互換） */
-  ok(/\.stop-btn \{ display:none; \}/.test(html), '個別ブレーキは非表示になっている');
+  /* 抽選ごとの定位置。隠したり畳んだりしないのでブレーキの位置が動かない */
   const { w } = boot();
-  for (let i = 0; i < 4; i++) ok(w.document.getElementById('stop-' + i), 'stop-' + i + ' のidは残っている');
+  const d = w.document;
+  eq(d.querySelectorAll('#cab-console .reel-row').length, 2, '下の段は 指令 と だれ の2つだけ');
+  ok(d.getElementById('cab-view').contains(d.getElementById('reel-0')), '行き先は車窓の中');
+  ok(d.getElementById('reward-board').contains(d.getElementById('reel-2')), 'ごほうびはLEDの中');
+  ok(!/\.reel-row\.pending/.test(html), '項目を隠す指定が残っていない');
+  ok(!/#dest-text|#station-sign/.test(html), '行き先の重複表示が残っていない');
   w.close();
 }
 {
-  /* 止まっている表示器を指していても、残っているものへ回復する */
+  /* 順番を飛ばして止めても、残りを止められる */
   const { w } = boot();
   w.eval('hideSplash()'); w.eval('closeNotice()');
   w.eval('startAll()');
-  w.eval('stopReel(0)');
-  w.eval('activeReel = 0');        // わざと止まった番号を指す
+  w.eval('stopReel(2)');
   w.eval('pullBrake()');
-  eq(w.eval('runningCount()'), 2, '止まっている番号を指していても、残りを止められる');
+  eq(w.eval('runningCount()'), 2, '順番を飛ばしても残りを止められる');
+  w.close();
+}
+{
+  /* 個別のブレーキidは残してある（既存テストとの互換） */
+  const { w } = boot();
+  for (let i = 0; i < 4; i++) ok(w.document.getElementById('stop-' + i), 'stop-' + i + ' のidが残っている');
   w.close();
 }
 
@@ -976,8 +1007,12 @@ console.log('\n[27] 画面構造');
   w.close();
 }
 {
-  /* 確定が進んでもブレーキの位置が動かないよう、表示器の高さを固定してある */
-  ok(/\.slot-container \{[^}]*min-height/.test(html), '表示器の領域に高さが確保されている');
+  /* 抽選ごとに定位置を持たせたので、確定が進んでも高さが変わらない
+     （以前は項目を隠す→出すで行数が増え、ブレーキが下へズレていた） */
+  ok(!/\.reel-row\.pending/.test(html), '項目を隠す指定が無い（＝行数が増減しない）');
+  const { w } = boot();
+  eq(w.document.querySelectorAll('#cab-console .reel-row').length, 2, '下の段は常に2行');
+  w.close();
 }
 
 
@@ -1034,35 +1069,19 @@ console.log('\n[28] 車窓の描画');
   w.close();
 }
 
-/* ---------- 29. 運転台の操作系 ---------- */
+/* ---------- 29. 操作系 ---------- */
 console.log('\n[29] 操作系');
 {
   const { w, errors } = boot();
-  w.eval('hideSplash()'); w.eval('closeNotice()');
-  ok(/はっしゃ/.test(w.document.getElementById('start-btn').textContent), '発車ボタンは平易な言葉になっている');
-  ok(!/マスコン/.test(html), 'なじみのない「マスコン」を使っていない');
-  ok(w.document.getElementById('horn-btn'), '警笛がある');
-  ok(w.document.getElementById('door-btn'), 'ドアがある');
-
-  /* 警笛は抽選に一切関与しない */
-  eq(w.document.getElementById('horn-btn').disabled, false, '警笛はいつでも押せる');
-  const before = w.eval('spinsLeft');
-  w.eval('pressHorn()'); w.eval('pressHorn()');
-  eq(w.eval('spinsLeft'), before, '警笛を押しても回数が減らない');
-  eq(w.eval('runningCount()'), 0, '警笛を押しても抽選は始まらない');
-
-  /* ドアは停車かつ行き先が決まってから */
-  eq(w.document.getElementById('door-btn').disabled, true, '行き先が決まる前は開けられない');
-  w.eval('startAll()');
-  eq(w.document.getElementById('door-btn').disabled, true, '走行中は開けられない');
-  for (let i = 0; i < 4; i++) w.eval('pullBrake()');
-  eq(w.document.getElementById('door-btn').disabled, false, '停車したら開けられる');
-  w.eval('pressDoor()');
-  ok(w.document.getElementById('bonus-msg').innerHTML.includes('ドアがひらきます'), 'ドアの案内が出る');
+  ok(/はっしゃ/.test(w.document.getElementById('start-btn').textContent), '発車ボタンは平易な言葉');
+  ok(!/マスコン/.test(html), 'なじみのない言葉を使っていない');
+  /* 警笛とドアは、役割を持たせられなかったので削除した */
+  ok(!w.document.getElementById('horn-btn'), '警笛ボタンは無い');
+  ok(!w.document.getElementById('door-btn'), 'ドアボタンは無い');
+  ok(!/pressHorn|pressDoor|hornSound|doorSound/.test(html), '警笛とドアのコードが残っていない');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }
-
 
 /* ---------- 30. 発車ボタンの状態 ---------- */
 console.log('\n[30] 発車ボタン');
@@ -1110,14 +1129,13 @@ console.log('\n[31] 操作系の配置');
   eq(mc.querySelectorAll('button').length, 2, '主操作は2つだけ');
   ok(/#main-controls button \{[^}]*flex:1/.test(html), '2つが同じ幅で並ぶ');
   ok(/#main-controls button \{[^}]*height:62px/.test(html), '2つが同じ高さ');
-
-  const sw = d.getElementById('switches');
-  ok(sw, '警笛とドアは別のまとまりにある');
-  ok(sw.contains(d.getElementById('horn-btn')), '警笛はスイッチ側');
-  ok(sw.contains(d.getElementById('door-btn')), 'ドアはスイッチ側');
-  ok(!mc.contains(d.getElementById('horn-btn')), '警笛が主操作に混ざっていない');
-  ok(d.querySelector('.console-top').contains(sw), 'スイッチは計器のとなりに置かれている');
+  ok(!d.getElementById('switches'), '小スイッチのまとまりは無くなった');
   ok(!/id="sub-controls"/.test(html), '旧レイアウトが残っていない');
+
+  /* 計器まわりは ごほうび表示器 と 速度計 だけ */
+  const top = d.querySelector('.console-top');
+  ok(top.contains(d.getElementById('reward-board')), 'ごほうび表示器が計器側にある');
+  ok(top.contains(d.getElementById('speedo')), '速度計が計器側にある');
   w.close();
 }
 
