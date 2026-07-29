@@ -1160,6 +1160,98 @@ console.log('\n[32] タブ復帰');
   w.close();
 }
 
+
+/* ---------- 33. 駅名が読めること ---------- */
+console.log('\n[33] 駅名の視認性');
+{
+  /* #reel-0 は .reel-box も持つため、黒背景と緑文字を打ち消していないと
+     確定後に「白い駅名標の中で黒地に黒文字」になり読めなくなる */
+  const css = html.match(/#dest-panel \.dp-name \{[^}]*\}/s);
+  ok(css, '#dest-panel .dp-name の指定がある(.reel-boxより強い)');
+  ok(/background:none/.test(css[0]), '表示器の黒背景を打ち消している');
+  ok(/height:auto/.test(css[0]), '表示器の固定高さを打ち消している');
+  ok(/#dest-panel\.fixed \.dp-name \{[^}]*color:#111/.test(html), '確定後は黒文字');
+  ok(/#dest-panel\.fixed \{[^}]*background:rgba\(248/.test(html), '確定後の背景は白');
+}
+
+/* ---------- 34. お地蔵さんの見せ方 ---------- */
+console.log('\n[34] お地蔵さん');
+{
+  const { w, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  const d = w.document;
+  const banner = d.getElementById('jizo-banner');
+  ok(banner, '当たったことを知らせる帯がある');
+  ok(d.getElementById('cab-view').contains(banner), '帯は車窓の中にある(スクロール不要)');
+  ok(d.getElementById('cab-view').contains(d.getElementById('cab-flash')), '閃光も車窓の中');
+
+  w.eval('showJizo()');
+  ok(banner.classList.contains('on'), '帯が出る');
+  ok(banner.textContent.includes('じぞうチャンス'), `当たったことが読める (${banner.textContent}) `);
+  ok(banner.textContent.includes('⭐') || banner.textContent.includes('円'), 'いくらもらえるかも読める');
+  ok(d.getElementById('jizo').classList.contains('on'), 'お地蔵さんが横切る');
+  ok(d.getElementById('cab-flash').classList.contains('on'), '車窓が光る');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 演出OFFでも「当たった」という情報は伝える */
+  const { w } = boot();
+  w.eval('settings.motion = false');
+  w.eval('showJizo()');
+  ok(w.document.getElementById('jizo-banner').classList.contains('on'), '演出OFFでも帯は出す(情報だから)');
+  eq(w.document.getElementById('jizo').classList.contains('on'), false, '演出OFFなら動かさない');
+  w.close();
+}
+
+/* ---------- 35. 達成ボタンの誤タップ防止 ---------- */
+console.log('\n[35] 達成ボタンの2回押し');
+{
+  const { w, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.eval('startAll()');
+  for (let i = 0; i < 4; i++) w.eval('pullBrake()');
+  const b = w.document.getElementById('clear-btn');
+
+  /* 1回目では確定しない */
+  w.eval('confirmClear()');
+  eq(w.eval('history.length'), 0, '1回目のタップでは記録されない');
+  ok(b.classList.contains('armed'), 'ボタンが確認状態になる');
+  ok(b.innerText.includes('ほんとうに'), `確認の文言に変わる (${b.innerText}) `);
+
+  /* 2回目で確定 */
+  w.eval('confirmClear()');
+  eq(w.eval('history.length'), 1, '2回目のタップで記録される');
+  ok(!b.classList.contains('armed'), 'ボタンが元に戻る');
+  ok(b.innerText.includes('ミッション達成'), '文言も元に戻る');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 時間が経てば解除される（押しっぱなしの誤爆を防ぐ） */
+  const { w } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.eval('startAll()');
+  for (let i = 0; i < 4; i++) w.eval('pullBrake()');
+  w.eval('confirmClear()');
+  w.eval('clearArmedAt = Date.now() - 9000');   // 4秒以上たった状態にする
+  w.eval('confirmClear()');
+  eq(w.eval('history.length'), 0, '時間が経っていたら1回目からやり直しになる');
+  w.close();
+}
+{
+  /* 発車したら確認状態は解除される */
+  const { w } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.eval('startAll()');
+  for (let i = 0; i < 4; i++) w.eval('pullBrake()');
+  w.eval('confirmClear()');
+  w.eval('startAll()');
+  eq(w.eval('clearArmedAt'), 0, '発車で確認状態が解除される');
+  ok(!w.document.getElementById('clear-btn').classList.contains('armed'), '見た目も戻る');
+  w.close();
+}
+
 /* ---------- 結果 ---------- */
 console.log(`\n${'='.repeat(46)}`);
 console.log(`  passed: ${passed}  failed: ${failed}`);
