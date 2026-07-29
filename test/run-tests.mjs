@@ -941,6 +941,42 @@ console.log('\n[26] 縦の圧縮');
   w.close();
 }
 
+
+/* ---------- 27. 画面構造の回帰防止 ---------- */
+console.log('\n[27] 画面構造');
+{
+  /* v7で「設定内の重複導線を消したときに </div> を1つ余分に消し、
+     タブバーが #tab-set(非表示) の中に閉じ込められて画面から消えた」。
+     HTMLの入れ子は壊れても構文エラーにならないので、テストで固定する */
+  const { w, errors } = boot();
+  const d = w.document;
+  eq(d.getElementById('tabbar').parentElement.tagName, 'BODY', 'タブバーは body 直下にある(タブの中に入っていない)');
+  ok(!d.getElementById('tab-set').contains(d.getElementById('tabbar')), 'タブバーが設定タブに飲み込まれていない');
+  ok(!d.getElementById('tab-play').contains(d.getElementById('tabbar')), 'タブバーがあそぶタブに飲み込まれていない');
+
+  const parents = ['tab-play','tab-log','tab-set'].map(i => d.getElementById(i).parentElement);
+  ok(parents.every(p => p === parents[0]), '3つのタブは同じ親を持つ(入れ子になっていない)');
+  ok(!d.getElementById('tab-play').contains(d.getElementById('tab-set')), 'タブ同士が入れ子になっていない');
+
+  ok(d.getElementById('tab-play').contains(d.getElementById('cab-view')), '車窓はあそぶタブの中');
+  ok(d.getElementById('tab-play').contains(d.getElementById('brake-btn')), 'ブレーキはあそぶタブの中');
+  ok(d.getElementById('tab-log').contains(d.getElementById('history-list')), '記録はきろくタブの中');
+  ok(d.getElementById('tab-set').contains(d.getElementById('parent-code')), 'あいことば欄はせっていタブの中');
+  ok(d.getElementById('tab-set').contains(d.getElementById('lock-btn')), 'ロックはせっていタブの中');
+  eq(d.getElementById('splash').parentElement.tagName, 'BODY', 'スプラッシュは body 直下');
+  eq(d.getElementById('notice').parentElement.tagName, 'BODY', '注意書きは body 直下');
+  eq(d.getElementById('ranks').parentElement.tagName, 'BODY', '称号一覧は body 直下');
+
+  /* 設定セクションが閉じ忘れていないか（今回の原因そのもの） */
+  ok(!/<div class="sec">\s*<div class="sec">/.test(html), '閉じていない .sec が残っていない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 確定が進んでもブレーキの位置が動かないよう、表示器の高さを固定してある */
+  ok(/\.slot-container \{[^}]*min-height/.test(html), '表示器の領域に高さが確保されている');
+}
+
 /* ---------- 結果 ---------- */
 console.log(`\n${'='.repeat(46)}`);
 console.log(`  passed: ${passed}  failed: ${failed}`);
