@@ -1152,7 +1152,7 @@ function stationByMeetCode(code) {
      同一オリジンに家族版の旧キーが残っている可能性があり、
      拾うと他アプリのデータを取り込んでしまうため。
    ========================================================= */
-const APP_VER = 'v18';
+const APP_VER = 'v19';
 const APP_KEY = 'mqgo_v1';
 
 /* 累計は種類ごとに分けて持つ。
@@ -1276,7 +1276,9 @@ const SCENES = [
     body:'#141d33', bldg:'#18233d', accent:'#ffe9a8', kinds:['bldg','pole'], stars:true },
   { key:'under', cls:'sc-under', tag:'🚇 ちかてつ',
     sky:['#0d1730','#060a16'], ground:'#151d33', rail:'#4a5a7e',
-    body:'#33456e', bldg:'#33456e', accent:'#ffe9b0', kinds:['lamp','pole'] }
+    body:'#33456e', bldg:'#33456e', accent:'#ffe9b0', kinds:['lamp'],
+    /* トンネル。wall=手前の壁 / wallFar=奥の壁（消失点へ向かって明るくする） */
+    tunnel:true, wall:'#151d33', wallFar:'#37507f' }
 ];
 
 /* 時刻 → 景色。境目は 5時 / 9時 / 16時 / 18時半 */
@@ -1423,6 +1425,56 @@ function cabInit() {
 function projY(y, z, horizon) { return horizon + (y * FOCAL) / z; }
 function projX(x, z, cx)      { return cx + (x * FOCAL) / z; }
 
+/* トンネルの断面。床から立ち上がって、上でアーチを描く */
+function archPath(c, z, cx, horizon) {
+  const HALF = 118, CROWN = -168, SPRING = -46, FLOOR = 30;
+  const lx = projX(-HALF, z, cx), rx = projX(HALF, z, cx);
+  const fy = projY(FLOOR, z, horizon);
+  const sy = projY(SPRING, z, horizon);
+  const ty = projY(CROWN, z, horizon);
+  c.beginPath();
+  c.moveTo(lx, fy);
+  c.lineTo(lx, sy);
+  /* 2次ベジェの頂点は (P0+2P1+P2)/4 なので、天井を ty に通すには
+     制御点を 2*ty-sy に置く */
+  c.quadraticCurveTo(cx, 2 * ty - sy, rx, sy);
+  c.lineTo(rx, fy);
+  c.closePath();
+}
+
+function drawTunnel(c, W, H, cx, horizon, sc) {
+  c.fillStyle = sc.wall;
+  c.fillRect(0, 0, W, H);
+
+  /* リングを手前から奥へ。手前のアーチのほうが大きいので、
+     この順に塗ると同心の輪が残って、奥へ吸い込まれて見える */
+  const RING = 46;
+  const off = CAB.dist * 0.9 % RING;
+  const zs = [];
+  for (let z = Z_NEAR + off; z < Z_FAR; z += RING) zs.push(z);
+  for (const z of zs) {
+    const t = Math.min(1, (z - Z_NEAR) / (Z_FAR - Z_NEAR));
+    /* 奥ほど明るく。手前は暗くして、トンネルの重さを出す */
+    c.fillStyle = mixHex(sc.wall, sc.wallFar, Math.pow(t, 0.75));
+    archPath(c, z, cx, horizon);
+    c.fill();
+  }
+  /* 継ぎ目。リングとリングの境目に細い線を入れると、
+     壁が「筒」ではなく「輪をつないだもの」に見える */
+  c.strokeStyle = 'rgba(0,0,0,0.30)';
+  for (const z of zs) {
+    c.lineWidth = Math.max(0.4, 130 / z);
+    archPath(c, z, cx, horizon);
+    c.stroke();
+  }
+  /* 床。線路が乗る面だけ、壁と分ける */
+  c.fillStyle = sc.ground;
+  c.beginPath();
+  c.moveTo(projX(-118, Z_NEAR, cx), projY(30, Z_NEAR, horizon));
+  c.lineTo(projX(118, Z_NEAR, cx), projY(30, Z_NEAR, horizon));
+  c.lineTo(cx, horizon); c.closePath(); c.fill();
+}
+
 function drawCab(dt) {
   const c = CAB.ctx; if (!c) return;
   const W = CAB.w, H = CAB.h, cx = W / 2, horizon = H * 0.54;
@@ -1454,6 +1506,9 @@ function drawCab(dt) {
   }
   /* 地面 */
   c.fillStyle = sc.ground; c.fillRect(0, horizon, W, H - horizon);
+  /* トンネル。空と地面の上に、まるごと描き直す */
+  if (sc.tunnel) drawTunnel(c, W, H, cx, horizon, sc);
+
   /* 消失点の光 */
   const glow = c.createRadialGradient(cx, horizon, 0, cx, horizon, W * 0.22);
   glow.addColorStop(0, 'rgba(255,255,255,.55)');
@@ -1573,10 +1628,13 @@ function drawCab(dt) {
         c.globalAlpha = alpha;
       }
     } else if (o.kind === 'lamp') {
-      /* 天井から吊るす。灯り本体と、その下のぼんやりした光 */
-      const ly = base - hh * 1.55, lh = Math.max(1, hh * 0.05);
+      /* 天井から吊るす。高さはアーチと同じ world 座標で決める。
+         画面座標で置いていたときは、天井と揃わず宙に浮いていた */
+      const CROWN = -168, LAMP_Y = -132;
+      const cy = projY(CROWN, o.z, horizon), ly = projY(LAMP_Y, o.z, horizon);
+      const lh = Math.max(1, 6 * k);
       c.fillStyle = mixHex(shade(sc.bldg || sc.body, 0.7), far, haze * 0.6);
-      c.fillRect(sx - Math.max(0.6, ww * 0.03), ly - hh * 0.1, Math.max(1, ww * 0.06), hh * 0.1);
+      c.fillRect(sx - Math.max(0.5, ww * 0.03), cy, Math.max(1, ww * 0.05), Math.max(1, ly - cy));
       c.fillStyle = sc.accent;
       c.fillRect(sx - ww * 0.5, ly, ww, lh);
       const g = c.createRadialGradient(sx, ly + lh, 0, sx, ly + lh, ww * 1.1);

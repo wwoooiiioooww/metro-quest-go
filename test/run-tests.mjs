@@ -2051,6 +2051,7 @@ console.log('\n[53] 保護者モードの除外');
 /* ビルが電柱に見えていた。窓の格子が固定ピクセルで遠近に追従せず、
    点灯も斜め縞だった。色も木と共用で、昼のビルが緑になっていた */
 console.log('\n[54] 車窓');
+const SCENE_KEYS = ['morning','day','dusk','night','under'];
 {
   const { w, errors } = boot();
   w.eval('hideSplash()'); w.eval('closeNotice()');
@@ -2081,6 +2082,19 @@ console.log('\n[54] 車窓');
   const lamps = w.eval('CAB.objs.filter(o => o.kind === "lamp").map(o => Math.abs(o.x))');
   ok(lamps.length > 0, 'ちかてつには天井灯が出る');
   ok(lamps.every(v => v === lamps[0]), '天井灯は左右そろっている');
+
+
+  /* トンネル。空と地面のまま色だけ暗くしたものだったので、壁とアーチを描く */
+  const und = w.eval('JSON.stringify(sceneByKey("under"))');
+  const u = JSON.parse(und);
+  eq(u.tunnel, true, 'ちかてつはトンネルとして描く');
+  ok(/^#[0-9a-f]{6}$/i.test(u.wall), '手前の壁の色がある');
+  ok(/^#[0-9a-f]{6}$/i.test(u.wallFar), '奥の壁の色がある');
+  ok(u.wall !== u.wallFar, '奥へ向かって色が変わる');
+  ok(!SCENE_KEYS.filter(k => k !== 'under').some(k => w.eval(`!!sceneByKey("${k}").tunnel`)),
+     '地上の景色はトンネルにしない');
+  eq(w.eval('typeof drawTunnel'), 'function', 'トンネルを描く関数がある');
+  eq(w.eval('typeof archPath'), 'function', 'アーチの形を作る関数がある');
 
   /* canvas が無い環境でも落ちないこと（jsdomは canvas 非対応） */
   w.eval('drawCab(0.05)');
