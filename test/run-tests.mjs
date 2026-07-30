@@ -50,7 +50,16 @@ function boot(ls, src) {
       if (ls) Object.entries(ls).forEach(([k, v]) => window.localStorage.setItem(k, v));
     },
   });
-  return { dom, w: dom.window, errors, alerts };
+  const win = dom.window;
+  /* アプリ内のお知らせ（notify）を読む。標準の alert はもう使っていない */
+  const notices = () => { try { return win.eval('NOTICES.slice()'); } catch (e) { return []; } };
+  /* 自前ダイアログの「OK」を押す。confirm の置きかえに対応するため */
+  const dlgOk = () => win.eval('okDlg()');
+  const dlgCancel = () => win.eval('closeDlg()');
+  const dlgText = () => (win.document.getElementById('dlg-msg') || {}).textContent || '';
+  const dlgOpen = () => win.document.getElementById('dlg').classList.contains('on');
+  const setDlgInput = v => { win.document.getElementById('dlg-input').value = v; };
+  return { dom, w: win, errors, alerts, notices, dlgOk, dlgCancel, dlgText, dlgOpen, setDlgInput };
 }
 
 /* ---------- 1. 起動 ---------- */
@@ -620,12 +629,12 @@ console.log('\n[17] 指令リストの行編集');
   w.close();
 }
 {
-  const { w, alerts } = boot();
+  const { w, notices } = boot();
   w.eval('settings.missions = ["ひとつだけ"]');
   w.eval('renderMissionEditor()');
   w.eval('delMission(0)');
   eq(w.eval('settings.missions.length'), 1, '最後の1件は削除できない');
-  ok(alerts.some(a => a.includes('最低1つ')), '理由が伝わる');
+  ok(notices().some(a => a.includes('最低1つ')), '理由が伝わる');
   w.close();
 }
 {
@@ -647,7 +656,7 @@ console.log('\n[17] 指令リストの行編集');
 /* ---------- 18. 保護者モードのロック ---------- */
 console.log('\n[18] 保護者モードのロック');
 {
-  const { w, alerts, errors } = boot();
+  const { w, notices, errors } = boot();
   w.prompt = () => '1234';
   w.eval('switchTab("set")');
   eq(w.eval('parentAuthed'), true, 'あいことばを通すと認証済みになる');
@@ -655,7 +664,7 @@ console.log('\n[18] 保護者モードのロック');
   w.eval('lockParent()');
   eq(w.eval('parentAuthed'), false, 'ロックで認証が外れる');
   ok(w.document.getElementById('tab-play').classList.contains('on'), 'ロックすると「あそぶ」タブへ戻る');
-  ok(alerts.some(a => a.includes('ロック')), 'ロックしたことがユーザーに伝わる');
+  ok(notices().some(a => a.includes('ロック')), 'ロックしたことがユーザーに伝わる');
 
   /* 子どもが設定を開こうとしても、あいことばを聞かれる */
   let asked = 0;
@@ -1093,7 +1102,7 @@ console.log('\n[29] 操作系');
 /* ---------- 30. 発車ボタンの状態 ---------- */
 console.log('\n[30] 発車ボタン');
 {
-  const { w, alerts, errors } = boot();
+  const { w, notices, errors } = boot();
   w.eval('hideSplash()'); w.eval('closeNotice()');
   const sb = w.document.getElementById('start-btn');
   eq(sb.disabled, false, '回数が残っていれば押せる');
@@ -1110,7 +1119,7 @@ console.log('\n[30] 発車ボタン');
 {
   /* 回数を使い切った状態で開くと、ボタンは普通の見た目のまま無反応だった */
   const st = { settings:null, spinsLeft:0, excluded:[], history:[], totalMoney:0, pin:null, noticeSeen:true };
-  const { w, alerts, errors } = boot({ mqgo_v1: JSON.stringify(st) });
+  const { w, notices, errors } = boot({ mqgo_v1: JSON.stringify(st) });
   const sb = w.document.getElementById('start-btn');
   eq(w.eval('spinsLeft'), 0, '回数ゼロの状態で起動');
   eq(sb.disabled, true, '回数ゼロなら最初から押せない状態になっている');
@@ -1118,7 +1127,7 @@ console.log('\n[30] 発車ボタン');
 
   /* それでも呼ばれたときに黙って終わらない */
   w.eval('startAll()');
-  ok(alerts.some(a => a.includes('リセット')), '押しても無反応ではなく、直し方を伝える');
+  ok(notices().some(a => a.includes('おわり')), '押しても無反応ではなく、直し方を伝える');
   eq(w.eval('runningCount()'), 0, '回数ゼロでは発車しない');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
@@ -1527,13 +1536,16 @@ console.log('\n[43] 累計はモードごとに分ける');
 }
 {
   /* 記録を消したら、両方の累計が0になる */
-  const { w } = boot();
+  const { w, dlgOk, dlgOpen, dlgText } = boot();
   w.eval('currentResult = {station:"上野", mission:"t", money:"⭐5こ", target:"みんな"}');
   w.eval('clearMission()');
   w.eval('setRewardMode("money")');
   w.eval('currentResult = {station:"銀座", mission:"t", money:"300円", target:"みんな"}');
   w.eval('clearMission()');
   w.eval('clearHistory()');
+  ok(dlgOpen(), '記録を消す前に かならず確認する');
+  ok(dlgText().includes('もどせません'), '取り消せないことを伝える');
+  dlgOk();
   eq(w.eval('totals.stamp'), 0, '記録を消したらスタンプも0');
   eq(w.eval('totals.money'), 0, '記録を消したら円も0');
   eq(w.eval('history.length'), 0, '記録も空');
@@ -1680,8 +1692,9 @@ console.log('\n[46] まちあわせコード');
 
   const B = boot(); B.w.eval('hideSplash()'); B.w.eval('closeNotice()');
   B.w.eval('startAll()');
-  B.w.prompt = () => code;
   B.w.eval('joinMeetCode()');
+  ok(B.dlgOpen(), 'コードの入力欄が出る');
+  B.setDlgInput(code); B.dlgOk();
   eq(B.w.eval('currentResult.station'), stA, '同じ駅になる');
   eq(B.w.eval('isRunning[0]'), false, '行き先は確定ずみ');
   eq(B.w.eval('runningCount()'), 3, '残り3つは自分で回す');
@@ -1695,32 +1708,227 @@ console.log('\n[46] まちあわせコード');
 }
 {
   /* 使えない場面と、まちがったコード */
-  const { w, alerts } = boot();
+  const { w, notices, dlgOk, dlgCancel, dlgOpen, setDlgInput } = boot();
   w.eval('hideSplash()'); w.eval('closeNotice()');
-  w.prompt = () => 'ZZZZ';
   w.eval('joinMeetCode()');
-  ok(alerts.some(a => a.includes('はっしゃ')), '発車前は「はっしゃして」と言う');
+  ok(notices().some(a => a.includes('はっしゃ')), '発車前は「はっしゃして」と言う');
+  ok(!dlgOpen(), '発車前は入力欄も出さない');
   eq(w.eval('currentResult.station'), '', '駅は入らない');
 
   w.eval('startAll()');
   w.eval('joinMeetCode()');
-  ok(alerts.some(a => a.includes('見つかりませんでした')), '知らないコードは断る');
+  setDlgInput('ZZZZ'); dlgOk();
+  ok(notices().some(a => a.includes('見つかりませんでした')), '知らないコードは断る');
   eq(w.eval('runningCount()'), 4, '断ったときは何も変えない');
 
-  w.prompt = () => null;              /* キャンセル */
   w.eval('joinMeetCode()');
+  dlgCancel();                        /* やめる */
   eq(w.eval('runningCount()'), 4, 'キャンセルでも何も変えない');
+  ok(!dlgOpen(), 'やめるで閉じる');
   w.close();
 }
 {
   /* 除外している駅でも、指定されたら従う（待ち合わせだから） */
-  const { w } = boot();
+  const { w, dlgOk, setDlgInput } = boot();
   w.eval('hideSplash()'); w.eval('closeNotice()');
   w.eval('startAll()');
   w.eval(`excludedStations = ['浅草']`);
-  w.prompt = () => w.eval('meetCodeOf("浅草")');
   w.eval('joinMeetCode()');
+  setDlgInput(w.eval('meetCodeOf("浅草")')); dlgOk();
   eq(w.eval('currentResult.station'), '浅草', '「行った」で塗ってある駅でも指定できる');
+  w.close();
+}
+
+/* ---------- 47. ポップアップを自前にする ---------- */
+/* ブラウザ標準の alert/confirm には「〜.github.io の内容」の行が必ず付く。
+   配布物としてここが一番あやしく見えるので、アプリ内の表示に置きかえた */
+console.log('\n[47] アプリ内のお知らせとダイアログ');
+{
+  const { w, notices, dlgOk, dlgCancel, dlgOpen, dlgText, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  const d = w.document;
+  ok(d.getElementById('toast'), 'お知らせの置き場がある');
+  ok(d.getElementById('dlg'), 'ダイアログの置き場がある');
+
+  w.eval('notify("てすと")');
+  ok(d.getElementById('toast').classList.contains('on'), 'お知らせが出る');
+  eq(d.getElementById('toast').textContent, 'てすと', '文言が出る');
+  ok(notices().includes('てすと'), '出した内容をあとから確かめられる');
+
+  /* 確認は「押すまで進まない」こと */
+  let done = 0;
+  w.eval('window.__t = 0');
+  w.eval('askConfirm("けしますか?", () => { window.__t = 1; })');
+  ok(dlgOpen(), '確認が開く');
+  eq(w.eval('window.__t'), 0, '開いただけでは実行しない');
+  dlgCancel();
+  eq(w.eval('window.__t'), 0, 'やめるを押したら実行しない');
+  ok(!dlgOpen(), 'やめるで閉じる');
+
+  w.eval('askConfirm("けしますか?", () => { window.__t = 1; })');
+  dlgOk();
+  eq(w.eval('window.__t'), 1, 'OKで実行する');
+  ok(!dlgOpen(), 'OKでも閉じる');
+
+  /* 入力 */
+  w.eval('window.__v = "x"');
+  w.eval('askInput("いれてね", v => { window.__v = v; })');
+  ok(dlgOpen(), '入力欄が開く');
+  ok(dlgText().includes('いれてね'), '文言が出る');
+  d.getElementById('dlg-input').value = 'AB12';
+  dlgOk();
+  eq(w.eval('window.__v'), 'AB12', '入れた値が渡る');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 標準のポップアップに戻っていないこと（回帰防止） */
+  const body = html.slice(html.indexOf('<script>'));
+  ok(!/[^.\w]alert\(/.test(body), 'alert() を使っていない');
+  ok(!/[^.\w]confirm\(/.test(body.replace(/confirmClear/g, '').replace(/askConfirm/g, '')),
+     'confirm() を使っていない');
+  /* prompt はPIN入力の1か所だけ残している（switchTabを非同期にできないため） */
+  eq((body.match(/[^.\w]prompt\(/g) || []).length, 1, 'prompt は PIN の1か所だけ');
+}
+
+/* ---------- 48. 行った駅を出すか出さないか ---------- */
+/* ⭐(達成)と✓(手の印)で意味が違っていて説明できなかったので、
+   「行った」という1つの意味にして、出す/出さないはスイッチで決める */
+console.log('\n[48] 行った駅を出さない');
+{
+  const { w, notices, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  eq(w.eval('settings.hideVisited'), true, '既定では行った駅を出さない');
+
+  const all = w.eval('getCandidates(true).length');
+  w.eval('excludedStations = getCandidates(true).slice(0, 30).map(s => s.name)');
+  eq(w.eval('getCandidates().length'), all - 30, '印のついた駅は候補から外れる');
+
+  /* 達成した駅(⭐)も同じあつかいになる（前はここが外れていなかった） */
+  w.eval('excludedStations = []');
+  const st = w.eval('getCandidates()[0].name');
+  w.eval(`history = [{ station:${JSON.stringify(st)}, mission:'m', money:'⭐1こ', target:'みんな', time:'9:00' }]`);
+  ok(!w.eval('getCandidates().map(s=>s.name)').includes(st), '達成した駅も候補から外れる');
+
+  /* スイッチを切ると全部出る */
+  w.eval('toggleHideVisited()');
+  eq(w.eval('settings.hideVisited'), false, 'スイッチで切りかえられる');
+  ok(w.eval('getCandidates().map(s=>s.name)').includes(st), '切ると達成した駅も出る');
+  ok(notices().some(a => a.includes('出します')), '切りかえたことを伝える');
+  eq(JSON.parse(w.localStorage.getItem('mqgo_v1')).settings.hideVisited, false, 'スイッチは保存される');
+
+  /* 全部行ったら、候補0にせず全部に戻す（回せなくなるほうが困る） */
+  w.eval('toggleHideVisited()');
+  w.eval('excludedStations = getCandidates(true).map(s => s.name)');
+  eq(w.eval('getCandidates().length'), all, '全駅に印がついたら、候補は0にせず全部に戻る');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 画面のスイッチが状態を正しく出す */
+  const { w } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()'); w.eval('switchTab("log")');
+  const b = w.document.getElementById('hv-btn');
+  ok(b.textContent.includes('出さない'), '既定は「出さない」と出る');
+  ok(!b.classList.contains('off'), '入っている見た目');
+  w.eval('toggleHideVisited()');
+  ok(b.textContent.includes('出す'), '切ると「出す」に変わる');
+  ok(b.classList.contains('off'), '切れている見た目');
+  w.close();
+}
+
+/* ---------- 49. 設定はタップした時点で保存する ---------- */
+/* 路線をタップ → ホームに戻る、で設定が消えていた。
+   しかも背面移行で自動ロックがかかるため、PINからやり直しになっていた */
+console.log('\n[49] 設定の即保存');
+{
+  const { w } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  const saved = () => JSON.parse(w.localStorage.getItem('mqgo_v1') || '{}').settings || {};
+
+  w.eval('toggleLine("G")');
+  ok(!saved().lines.includes('G'), '路線を外したら、その場で保存される');
+  w.eval('toggleLine("G")');
+  ok(saved().lines.includes('G'), '戻したら、それも保存される');
+
+  w.eval('toggleArea("tokyo23")');
+  eq(saved().areas.includes('tokyo23'), false, 'エリアもその場で保存される');
+  w.eval('toggleArea("tokyo23")');
+
+  w.eval('setRewardMode("money")');
+  eq(saved().rewardMode, 'money', 'ごほうびモードもその場で保存される');
+
+  /* 背面に回して自動ロックがかかっても、設定は残っている */
+  w.eval('parentAuthed = true');
+  w.eval('document.dispatchEvent(new Event("visibilitychange"))');
+  eq(saved().rewardMode, 'money', 'ロックがかかっても設定は残る');
+  w.close();
+}
+
+/* ---------- 50. バックアップ ---------- */
+/* ブラウザのデータを消すと全部消える。半年使ったあとに消えるのが
+   このアプリで一番いたい事故なので、持ち出せる形にする */
+console.log('\n[50] バックアップ');
+{
+  const { w, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.URL.createObjectURL = () => 'blob:x';
+  w.URL.revokeObjectURL = () => {};
+  w.eval('currentResult = {station:"上野", mission:"銭湯をさがす", money:"⭐3こ", target:"みんな"}');
+  w.eval('clearMission()');
+  w.eval('exportData()');
+  const text = w.document.getElementById('backup-box').value;
+  ok(text.length > 0, '書き出した文字列が出る');
+  const parsed = JSON.parse(text);
+  eq(parsed.tag, 'mqgo-backup', '目印がついている');
+  eq(parsed.store.history.length, 1, '記録が入っている');
+  ok(!/https?:\/\//.test(text), '外部のURLは入っていない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 別の端末に見立てて読み込む */
+  const src = boot();
+  src.w.eval('hideSplash()'); src.w.eval('closeNotice()');
+  src.w.URL.createObjectURL = () => 'blob:x'; src.w.URL.revokeObjectURL = () => {};
+  src.w.eval('currentResult = {station:"上野", mission:"銭湯", money:"⭐3こ", target:"みんな"}');
+  src.w.eval('clearMission()');
+  src.w.eval('excludedStations = ["浅草"]; store.excluded = excludedStations; saveStore()');
+  src.w.eval('exportData()');
+  const text = src.w.document.getElementById('backup-box').value;
+  src.w.close();
+
+  const { w, dlgOk, dlgOpen, dlgText, notices, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  eq(w.eval('history.length'), 0, '読み込む前は空');
+  w.document.getElementById('backup-box').value = text;
+  w.eval('openImport()');
+  ok(dlgOpen(), '上書きの前に かならず確認する');
+  ok(dlgText().includes('もどせません'), '取り消せないと伝える');
+  ok(dlgText().includes('1件'), '何件読み込むのか伝える');
+  dlgOk();
+  eq(w.eval('history.length'), 1, '記録が入る');
+  eq(w.eval('history[0].station'), '上野', '中身が正しい');
+  eq(w.eval('totals.stamp'), 3, '累計も戻る');
+  ok(w.eval('excludedStations').includes('浅草'), '印も戻る');
+  ok(w.document.querySelector('.ticket'), '画面もその場で描き直される');
+  ok(notices().some(a => a.includes('読み込みました')), '読み込んだことを伝える');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 壊れた文字列でアプリを起動不能にしない */
+  const { w, notices, dlgOpen } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  const box = w.document.getElementById('backup-box');
+  for (const bad of ['', '   ', 'こんにちは', '{"a":1}', '{"tag":"mqgo-backup"}', '{"tag":"x","store":{"history":[]}}']) {
+    box.value = bad;
+    w.eval('openImport()');
+    ok(!dlgOpen(), `壊れた入力では確認を出さない (${JSON.stringify(bad).slice(0, 14)})`);
+    eq(w.eval('history.length'), 0, '記録は変えない');
+  }
+  ok(notices().some(a => a.includes('形式では')), '形式が違うと伝える');
+  ok(notices().some(a => a.includes('貼りつけて')), '空なら貼りつけを促す');
   w.close();
 }
 

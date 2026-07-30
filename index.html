@@ -236,6 +236,9 @@
   .reel-label {
     font-size:0.62em; color:var(--grey); writing-mode:vertical-rl; text-orientation:upright;
     letter-spacing:1px; flex-shrink:0;
+    /* フォントが縦書きの高さを返さない端末があるため、こちらで確保する。
+       確保しないと漢字のラベルだけ 2px に潰れて読めなくなる */
+    min-height:2.4em; display:flex; align-items:center; justify-content:center;
   }
   .reel-box {
     flex-grow:1; min-width:0; font-size:1.05em; font-weight:bold; color:#7CFC55; height:50px;
@@ -336,8 +339,8 @@
   }
   .tk-station { font-size:1.25em; font-weight:bold; letter-spacing:1px; line-height:1.2; }
   .tk-time { margin-left:auto; font-size:0.85em; color:#7a6f57; font-variant-numeric:tabular-nums; }
-  .tk-lines { display:flex; gap:3px; flex-wrap:wrap; margin-bottom:5px; }
-  .tk-mission { line-height:1.35; }
+  .tk-lines { display:flex; gap:3px; flex-wrap:wrap; margin-bottom:5px; justify-content:flex-start; }
+  .tk-mission { line-height:1.35; text-align:left; }
   .tk-foot {
     display:flex; align-items:center; gap:6px; margin-top:6px;
     font-size:0.9em; color:#5c5344;
@@ -357,25 +360,41 @@
   #collect-total { text-align:center; font-size:0.9em; margin-bottom:8px; }
   #collect-total b { color:var(--cyan); font-size:1.5em; font-variant-numeric:tabular-nums; }
   .cl-line { margin-bottom:9px; }
+  /* summary に進捗を出すので、畳んだままでも制覇状況は分かる */
+  .cl-line > summary { list-style:none; cursor:pointer; }
+  .cl-line > summary::-webkit-details-marker { display:none; }
   .cl-head {
     display:flex; align-items:center; gap:6px;
     font-size:0.8em; font-weight:bold; margin-bottom:3px;
   }
+  .cl-caret { color:var(--grey); font-size:0.9em; transition:transform .15s; flex-shrink:0; }
+  .cl-line[open] .cl-caret { transform:rotate(90deg); }
   .cl-dot { width:11px; height:11px; border-radius:50%; flex-shrink:0; }
   .cl-count { margin-left:auto; color:#8395a7; font-variant-numeric:tabular-nums; }
   /* 進捗バー。路線カラーで伸びる */
   .cl-bar { height:4px; border-radius:2px; background:#1a2740; overflow:hidden; margin-bottom:4px; }
   .cl-bar > i { display:block; height:100%; border-radius:2px; }
-  .cl-stations { display:flex; flex-wrap:wrap; gap:3px; }
+  .cl-stations { display:flex; flex-wrap:wrap; gap:5px; padding-top:4px; }
+  /* 子どもが指で押すので、44px四方に近い当たり判定を確保する */
   .cl-st {
-    font-size:0.72em; padding:2px 6px; border-radius:9px; cursor:pointer;
+    font-size:0.78em; padding:7px 10px; border-radius:9px; cursor:pointer;
     border:1px solid #2c3a52; color:#5a6a82; background:#0d1526;
+    min-height:32px; display:inline-flex; align-items:center;
   }
   /* 達成した駅。⭐がつく */
   .cl-st.got { color:#fff; border-color:transparent; font-weight:bold; }
   /* 手で「行った」にした駅。塗るが、達成とは見分けられるようにする */
   .cl-st.marked { color:#e8eef6; border-style:dashed; background:#1b2740; }
   #collect-note { font-size:0.72em; color:#8395a7; text-align:center; margin-top:7px; line-height:1.5; }
+  #backup-box {
+    width:100%; box-sizing:border-box; font-size:0.7em; font-family:monospace;
+    background:#0b1020; color:#9fd8ff; border:2px solid var(--line); border-radius:8px;
+    padding:7px; resize:vertical; word-break:break-all;
+  }
+  #backup-note { min-height:1em; }
+  #hide-visited-row { text-align:center; margin-top:11px; }
+  #hv-btn.off { background:#3a4358; }
+  #hv-note { font-size:0.72em; color:#8395a7; margin-top:5px; line-height:1.5; }
 
   /* ---- まちあわせコード ----
      駅が決まったら4文字を出す。相手が入れると同じ駅になる。
@@ -480,6 +499,41 @@
   body.no-motion #cab-view::after { transition:none; }
   body.no-motion .sp-train, body.no-motion .sp-rail { animation:none; }
 
+  /* ---- お知らせ（トースト）と ダイアログ ----
+     ブラウザ標準の alert/confirm はURLの行が出てしまうため自前にする */
+  #toast {
+    position:fixed; left:50%; top:14px; transform:translateX(-50%) translateY(-16px);
+    z-index:600; max-width:88%; width:max-content;
+    background:#0d1b33; color:#fff; border:2px solid var(--cyan); border-radius:11px;
+    padding:11px 16px; font-size:0.86em; line-height:1.5; text-align:center;
+    white-space:pre-line; box-shadow:0 6px 20px rgba(0,0,0,.5);
+    opacity:0; pointer-events:none; transition:opacity .2s, transform .2s;
+  }
+  #toast.on { opacity:1; transform:translateX(-50%) translateY(0); }
+  #dlg {
+    position:fixed; inset:0; z-index:610; background:rgba(6,10,22,.72);
+    display:none; align-items:center; justify-content:center; padding:18px;
+  }
+  #dlg.on { display:flex; }
+  .dlg-box {
+    background:var(--panel); border:2px solid var(--line); border-radius:13px;
+    padding:17px 15px 14px; max-width:330px; width:100%; text-align:center;
+    box-shadow:0 10px 30px rgba(0,0,0,.6);
+  }
+  #dlg-msg { font-size:0.9em; line-height:1.6; white-space:pre-line; margin-bottom:12px; }
+  #dlg-input {
+    width:100%; box-sizing:border-box; text-align:center; font-size:1.2em; letter-spacing:4px;
+    padding:9px; border-radius:8px; border:2px solid var(--line);
+    background:#0b1020; color:#fff; margin-bottom:12px; font-family:monospace;
+  }
+  .dlg-btns { display:flex; gap:9px; }
+  .dlg-btns button {
+    flex:1; padding:11px 0; border-radius:9px; font-size:0.9em; font-weight:bold;
+    cursor:pointer; border:none;
+  }
+  #dlg-cancel { background:#3a4358; color:#dfe6f0; }
+  #dlg-ok { background:var(--green); color:#fff; }
+
   /* 紙吹雪 */
   .confetti { position:fixed; top:-10%; font-size:1.6em; pointer-events:none; animation:fall 2.2s linear forwards; z-index:99; }
   @keyframes fall { to { transform:translateY(115vh) rotate(540deg); opacity:0.8; } }
@@ -491,6 +545,18 @@
     <div class="sp-train">🚃</div>
     <div class="sp-rail"></div>
     <div class="sp-title">地下鉄クエストGO</div>
+  </div>
+
+  <div id="toast" role="status"></div>
+  <div id="dlg">
+    <div class="dlg-box">
+      <div id="dlg-msg"></div>
+      <input type="text" id="dlg-input" autocomplete="off" style="display:none">
+      <div class="dlg-btns">
+        <button id="dlg-cancel" onclick="closeDlg()">やめる</button>
+        <button id="dlg-ok" onclick="okDlg()">OK</button>
+      </div>
+    </div>
   </div>
 
   <h1 id="title">🚇 地下鉄クエストGO</h1>
@@ -547,7 +613,8 @@
       これは秘密を守るためのものではなく、<b>お子さまの誤操作を防ぐため</b>のものです。わすれた場合は、ブラウザのデータを消すと初期値に戻ります（記録も消えます）。</p>
 
       <p class="lead">■ データについて</p>
-      <p>ブラウザのデータを消すと記録も消えます。バックアップ機能はありません。</p>
+      <p>記録はこの端末の中だけに保存されます。<b>ブラウザのデータを消すと記録も消えます。</b><br>
+      ⚙️せってい の「💾 バックアップ」から書き出しておくと、消えても戻せます。</p>
     </details>
 
     <button id="notice-ok" onclick="closeNotice()">よみました</button>
@@ -620,25 +687,26 @@
 
   <div class="tab-pane" id="tab-log">
 
+  <!-- 冒険の記録。いちばん見たいものなので先頭に置く -->
+  <div class="panel">
+    <h3>🎫 冒険の記録</h3>
+    <div id="history-list">まだ記録がありません</div>
+  </div>
+
   <!-- 行った駅コレクション（もとの「除外リスト」を前向きな見せ方にしたもの） -->
   <div class="panel">
     <h3>🗺️ 行った駅コレクション</h3>
     <div id="collect-total"></div>
     <div id="collect-lines"></div>
-    <div style="text-align:center; margin-top:9px;">
-      <button class="small-btn" onclick="excludeCurrent()">今出ている駅を「行った」にする</button>
+    <div id="hide-visited-row">
+      <button class="small-btn" id="hv-btn" onclick="toggleHideVisited()"></button>
+      <div id="hv-note"></div>
     </div>
     <div id="collect-note">
-      ⭐ = このアプリで達成した駅　／　✓ = 手で「行った」にした駅<br>
-      駅名をタップすると切りかえられます。塗った駅はルーレットに出なくなります。
+      ⭐ = このアプリで達成した駅　／　✓ = 手でつけた印<br>
+      駅名をタップすると、印を つけたり けしたり できます。
     </div>
     <div id="excluded-list" style="display:none"></div>
-  </div>
-
-  <!-- 冒険の記録 -->
-  <div class="panel">
-    <h3>📖 今日の冒険の記録</h3>
-    <div id="history-list" style="color:#8395a7; font-size:0.85em; text-align:center;">まだ記録がありません</div>
   </div>
 
   <!-- ============ 保護者設定 ============ -->
@@ -751,6 +819,19 @@
         <button type="button" class="small-btn" onclick="changePin()">変更</button>
       </form>
     </div>
+
+    <h4>💾 バックアップ</h4>
+    <div class="note">
+      ブラウザのデータを消すと、記録も設定も消えます。
+      ときどき書き出して、どこかに残しておくと安心です。
+    </div>
+    <div style="text-align:center; margin:7px 0;">
+      <button class="small-btn" onclick="exportData()">⬇️ 書き出す</button>
+      <button class="small-btn" onclick="openImport()">⬆️ 読み込む</button>
+    </div>
+    <textarea id="backup-box" rows="4" autocomplete="off" spellcheck="false"
+              placeholder="ここにバックアップの文字列を貼りつけて「⬆️ 読み込む」を押します"></textarea>
+    <div id="backup-note" class="note"></div>
 
     <button id="save-btn" onclick="saveSettings()">💾 設定を保存して閉じる</button>
   </div>
@@ -920,6 +1001,7 @@ const DEFAULT_SETTINGS = {
   areas: ["tokyo23"],
   lines: Object.keys(LINES).filter(l => TARGET.companies.includes(LINES[l].co)),
   spinsPerDay: 20,
+  hideVisited: true,      /* 行った駅をルーレットに出さない */
   rewardMode: "stamp",
   motion: true,
   targets: [
@@ -958,6 +1040,67 @@ function rewardValue(label) {
 function entryMode(h) {
   if (h && (h.mode === 'stamp' || h.mode === 'money')) return h.mode;
   return /[★⭐]/.test(String(h && h.money)) ? 'stamp' : 'money';
+}
+
+/* =========================================================
+   2-a. お知らせとダイアログ
+   ブラウザ標準の alert/confirm/prompt は、どれも
+   「wwoooiiioooww.github.io の内容」という行が付く。
+   配布物としてここが一番あやしく見えるので、自前にする。
+   ========================================================= */
+let NOTICES = [];                 /* 出したお知らせ。テストから確かめるために残す */
+let toastTimer = 0;
+let dlgOnOk = null;
+
+/* 一方通行のお知らせ。押さなくても消える */
+function notify(msg, ms) {
+  NOTICES.push(String(msg));
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = String(msg);
+  el.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('on'), ms || 2800);
+}
+function closeDlg() {
+  dlgOnOk = null;
+  const d = document.getElementById('dlg');
+  if (d) d.classList.remove('on');
+}
+function okDlg() {
+  const fn = dlgOnOk;
+  const inp = document.getElementById('dlg-input');
+  const val = inp && inp.style.display !== 'none' ? inp.value : null;
+  closeDlg();
+  if (fn) fn(val);
+}
+/* はい／やめる を聞く。confirm の置きかえ */
+function askConfirm(msg, onYes, okLabel) {
+  const d = document.getElementById('dlg');
+  if (!d) { if (onYes) onYes(null); return; }          /* 出せない環境では止めない */
+  document.getElementById('dlg-msg').textContent = String(msg);
+  document.getElementById('dlg-input').style.display = 'none';
+  document.getElementById('dlg-cancel').style.display = '';
+  document.getElementById('dlg-ok').textContent = okLabel || 'OK';
+  dlgOnOk = () => onYes && onYes(true);
+  d.classList.add('on');
+}
+/* 入力を求める。prompt の置きかえ */
+function askInput(msg, onOk, opts) {
+  const o = opts || {};
+  const d = document.getElementById('dlg');
+  if (!d) return;
+  document.getElementById('dlg-msg').textContent = String(msg);
+  const inp = document.getElementById('dlg-input');
+  inp.style.display = '';
+  inp.value = o.value || '';
+  inp.setAttribute('maxlength', o.maxlength || 40);
+  inp.setAttribute('placeholder', o.placeholder || '');
+  document.getElementById('dlg-cancel').style.display = '';
+  document.getElementById('dlg-ok').textContent = o.okLabel || 'OK';
+  dlgOnOk = v => onOk && onOk(v);
+  d.classList.add('on');
+  setTimeout(() => { try { inp.focus(); } catch (e) {} }, 30);
 }
 
 /* =========================================================
@@ -1004,7 +1147,7 @@ function stationByMeetCode(code) {
      同一オリジンに家族版の旧キーが残っている可能性があり、
      拾うと他アプリのデータを取り込んでしまうため。
    ========================================================= */
-const APP_VER = 'v16';
+const APP_VER = 'v17';
 const APP_KEY = 'mqgo_v1';
 
 /* 累計は種類ごとに分けて持つ。
@@ -1442,14 +1585,30 @@ function showJizo() {
 /* =========================================================
    4. 候補生成(フィルタ本体)
    ========================================================= */
+/* 達成した駅（記録に残っている駅）。手でつけた印とは別に持つ */
+function visitedStations() {
+  return new Set(history.map(h => h.station).filter(Boolean));
+}
+/* 「行った駅」= 達成した駅(⭐) ＋ 手でつけた印(✓)。
+   どちらも同じ意味なので、まとめて1つの集合として扱う */
+function visitedAll() {
+  const s = visitedStations();
+  for (const x of excludedStations) s.add(x);
+  return s;
+}
 function getCandidates(ignoreExclude=false) {
   const sel = new Set(settings.lines);
   const areas = new Set(settings.areas);
-  return Object.values(STATIONS).filter(st =>
-    areas.has(st.area) &&
-    st.lines.some(l => sel.has(l)) &&
-    (ignoreExclude || !excludedStations.includes(st.name))
+  /* 行った駅を外すかどうかは設定しだい。外した結果0駅になるなら外さない
+     （「候補が0で回せない」より「同じ駅がまた出る」ほうがまだよい） */
+  const hide = !ignoreExclude && settings.hideVisited !== false;
+  const base = Object.values(STATIONS).filter(st =>
+    areas.has(st.area) && st.lines.some(l => sel.has(l))
   );
+  if (!hide) return base;
+  const skip = visitedAll();
+  const left = base.filter(st => !skip.has(st.name));
+  return left.length > 0 ? left : base;
 }
 
 /* =========================================================
@@ -1560,7 +1719,7 @@ function copyMeetCode() {
       navigator.clipboard.writeText(code).catch(() => {});
     }
   } catch (e) {}
-  alert(`まちあわせコード【${code}】\n\nともだちがこのコードを入れると、\nおなじ「${st}」になります。\n\n※ 指令とごほうびは、おうちごとにちがいます`);
+  notify(`まちあわせコード【${code}】\nともだちが入れると おなじ「${st}」になります\n※ 指令とごほうびは おうちごとに ちがいます`, 4200);
 }
 /* コードを入れたら、その駅で確定させる。
    路線がOFFでも「行った」で塗ってあっても、指定された駅を優先する
@@ -1569,12 +1728,17 @@ function joinMeetCode() {
   /* 走行中に使うのが本来の使い方（行き先だけ先に決めてしまう）。
      まだ発車していないときだけ断る */
   if (!isRunning.some(Boolean) && !currentResult.station) {
-    alert('さきに「🚃 はっしゃ」を おしてね。'); return;
+    notify('さきに「🚃 はっしゃ」を おしてね。'); return;
   }
-  const input = prompt('ともだちの まちあわせコード（4文字）を入れてね');
-  if (input === null) return;
+  askInput('ともだちの まちあわせコード（4文字）を\n入れてね', v => applyMeetCode(v),
+           { maxlength: 4, placeholder: '____', okLabel: 'きめる' });
+}
+/* 入力されたコードを実際に反映する。joinMeetCode から分けてあるのは、
+   ダイアログの返事があとから来るため */
+function applyMeetCode(input) {
+  if (input === null || input === undefined) return;
   const name = stationByMeetCode(input);
-  if (!name) { alert('そのコードの駅が見つかりませんでした。\n4文字を もういちど たしかめてね。'); return; }
+  if (!name) { notify('そのコードの駅が 見つかりませんでした。\n4文字を もういちど たしかめてね。'); return; }
   const st = STATIONS[name];
   const wasRunning = isRunning.some(Boolean);
 
@@ -1590,7 +1754,7 @@ function joinMeetCode() {
   const rest = nextRunningReel();
   if (rest >= 0) { activeReel = rest; spinReel(rest, spinAvail.length ? spinAvail : getCandidates()); updateReelFocus(); }
   else if (wasRunning) { checkAllStopped(); }   /* 確定ずみの回に入れ直しただけなら鳴らさない */
-  alert(`ともだちと おなじ「${name}」になりました!`);
+  notify(`ともだちと おなじ「${name}」に なりました!`);
 }
 
 /* いま順番が来た表示器だけを回す。
@@ -1621,12 +1785,12 @@ function startAll() {
   /* 回数を使い切った状態で開くと、ボタンは普通の見た目のまま何も起きなかった。
      黙って return せず、理由と直し方を伝える */
   if (spinsLeft <= 0) {
-    alert("きょうのぶんは おわりです。\n⚙️せってい →「残り回数をリセット」でまた のれます。");
+    notify("きょうのぶんは おわりです。\n⚙️せってい →「残り回数をリセット」で また のれます。", 3600);
     updateStartBtn();
     return;
   }
   const avail = getCandidates();
-  if (avail.length === 0) { alert("候補の駅が0駅です!⚙️設定でエリアや路線を見直してね。"); return; }
+  if (avail.length === 0) { notify("候補の駅が 0駅です!\n⚙️せってい でエリアや路線を 見なおしてね。", 3600); return; }
   spinsLeft--;
   store.spinsLeft = spinsLeft; saveStore();
   updateHeader();
@@ -1870,10 +2034,6 @@ function renderHistory() {
   }
   list.innerHTML = history.map(ticketHTML).join('');
 }
-/* 達成した駅（記録に残っている駅）。除外とは別に持つ */
-function visitedStations() {
-  return new Set(history.map(h => h.station).filter(Boolean));
-}
 /* いま候補になりうる路線だけを見る。全374駅を出すと関係ない路線まで並ぶ */
 function collectLines() {
   return settings.lines.filter(l => LINES[l]);
@@ -1882,6 +2042,28 @@ function collectLines() {
    （「制覇」は路線まるごとで数えたほうが気持ちがいい） */
 function stationsOfLine(l) {
   return Object.values(STATIONS).filter(st => st.lines.includes(l)).map(st => st.name);
+}
+
+/* 「行った駅を出さない」の切りかえ。
+   ⭐も✓も同じ「行った」なので、まとめてこの1つが効く */
+function toggleHideVisited() {
+  settings.hideVisited = settings.hideVisited === false;
+  persistSettings();
+  renderCollection(); updateSummary();
+  notify(settings.hideVisited
+    ? '行った駅は ルーレットに 出しません'
+    : '行った駅も ルーレットに 出します');
+}
+function renderHideVisited() {
+  const b = document.getElementById('hv-btn');
+  const t = document.getElementById('hv-note');
+  if (!b || !t) return;
+  const on = settings.hideVisited !== false;
+  b.textContent = on ? '🚫 行った駅は 出さない' : '🔁 行った駅も 出す';
+  b.classList.toggle('off', !on);
+  t.innerHTML = on
+    ? 'いま、印のついた駅は ルーレットに出ません。<br>まだ知らない街に 当たりやすくなります。'
+    : 'いま、印のついた駅も ルーレットに出ます。<br>お気に入りの駅に もう一度 行けます。';
 }
 
 function renderCollection() {
@@ -1899,6 +2081,7 @@ function renderCollection() {
     all.add(name);
     if (got.has(name) || marked.has(name)) done.add(name);
   }
+  renderHideVisited();
   tot.innerHTML = all.size === 0
     ? '<span style="color:#8395a7">路線が選ばれていません</span>'
     : `<b>${done.size}</b> / ${all.size} 駅　いってきた!`;
@@ -1916,11 +2099,16 @@ function renderCollection() {
       return `<span class="${cls}"${style} onclick="toggleExcludeStation('${esc(nm)}')">` +
              `${esc(nm)}${mark}</span>`;
     }).join('');
-    return `<div class="cl-line">` +
-      `<div class="cl-head"><span class="cl-dot" style="background:${c}"></span>` +
-      `<span>${esc(LINES[l].n)}</span><span class="cl-count">${d}/${names.length}</span></div>` +
-      `<div class="cl-bar"><i style="width:${pct}%; background:${c}"></i></div>` +
-      `<div class="cl-stations">${chips}</div></div>`;
+    /* 畳んでおく。進捗（バーと n/m）は summary 側に置くので、
+       全部閉じたままでも「どの路線をどれだけ回ったか」は一覧できる */
+    return `<details class="cl-line">` +
+      `<summary>` +
+        `<div class="cl-head"><span class="cl-caret">▶</span>` +
+        `<span class="cl-dot" style="background:${c}"></span>` +
+        `<span>${esc(LINES[l].n)}</span><span class="cl-count">${d}/${names.length}</span></div>` +
+        `<div class="cl-bar"><i style="width:${pct}%; background:${c}"></i></div>` +
+      `</summary>` +
+      `<div class="cl-stations">${chips}</div></details>`;
   }).join('');
 }
 
@@ -1941,11 +2129,6 @@ function renderExcluded() {
 /* =========================================================
    8. 除外操作
    ========================================================= */
-function excludeCurrent() {
-  const st = currentResult.station || lastStation;
-  if (!st) { alert("先にルーレットを回してね!"); return; }
-  addExclude(st);
-}
 function addExclude(st) {
   if (!excludedStations.includes(st)) {
     excludedStations.push(st);
@@ -1996,7 +2179,7 @@ function switchTab(name) {
       ? "🔐 保護者のあいことば(PIN)を入力してください\n\nはじめは「1234」です。\n（せってい の中でいつでも変更できます）"
       : "🔐 保護者のあいことば(PIN)を入力してください");
     if (pin === null) return;
-    if (pin !== getPin()) { alert("あいことばが違います"); return; }
+    if (pin !== getPin()) { notify("あいことばが ちがいます"); return; }
     parentAuthed = true;
   }
   TABS.forEach(t => {
@@ -2023,7 +2206,7 @@ function openSettings() { switchTab('set'); }
 function lockParent() {
   parentAuthed = false;
   switchTab('play');
-  alert("🔒 ロックしました。せっていを開くにはあいことばが必要です。");
+  notify("🔒 ロックしました。\nせってい を開くには あいことばが 必要です。");
 }
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') parentAuthed = false;
@@ -2090,11 +2273,13 @@ function renderSettings() {
 function toggleArea(id) {
   const i = settings.areas.indexOf(id);
   if (i >= 0) settings.areas.splice(i,1); else settings.areas.push(id);
+  persistSettings();          /* 押した時点で保存する。背面に回っても消えない */
   renderSettings(); updateSummary();
 }
 function toggleLine(l) {
   const i = settings.lines.indexOf(l);
   if (i >= 0) settings.lines.splice(i,1); else settings.lines.push(l);
+  persistSettings();
   renderSettings(); updateSummary(); renderCollection();
 }
 function toggleCompany(co) {
@@ -2140,7 +2325,7 @@ function updatePcts(elId) {
 }
 function getArr(elId){ return elId==='target-editor' ? settings.targets : rewardTable(); }
 function editItem(elId,i,key,val){ getArr(elId)[i][key] = key==='w' ? (+val||0) : val; updatePcts(elId); }
-function delItem(elId,i){ const a=getArr(elId); if(a.length<=1){alert("最低1つは必要です");return;} a.splice(i,1); renderWeightEditor(elId,a); }
+function delItem(elId,i){ const a=getArr(elId); if(a.length<=1){notify("最低1つは 必要です");return;} a.splice(i,1); renderWeightEditor(elId,a); }
 function addTargetRow(){ settings.targets.push({label:"あたらしい人", w:10}); renderWeightEditor('target-editor',settings.targets); }
 function addMoneyRow(){ const a=rewardTable(); a.push({label: rewardMode()==='money' ? "100円" : "⭐1こ", w:10}); renderWeightEditor('money-editor',a); }
 
@@ -2155,6 +2340,7 @@ function setMotion(on) {
 function setRewardMode(m){
   if (m === 'money' && !ALLOW_MONEY_MODE) return;
   settings.rewardMode = (m === 'money') ? 'money' : 'stamp';
+  persistSettings();
   renderSettings(); updateHeader();
 }
 
@@ -2169,7 +2355,7 @@ function renderMissionEditor() {
 }
 function editMission(i, v){ settings.missions[i] = v; }
 function delMission(i){
-  if (settings.missions.length <= 1) { alert("指令は最低1つ必要です"); return; }
+  if (settings.missions.length <= 1) { notify("指令は 最低1つ 必要です"); return; }
   settings.missions.splice(i,1);
   renderMissionEditor();
 }
@@ -2180,10 +2366,11 @@ function addMissionRow(){
   if (first) { first.focus(); first.select(); }
 }
 function resetMissions(){
-  if (confirm("指令リストを初期状態に戻しますか?")) {
+  askConfirm("指令リストを 初期状態に もどしますか?", () => {
     settings.missions = [...DEFAULT_MISSIONS];
     renderMissionEditor();
-  }
+    notify('指令リストを もどしました');
+  }, 'もどす');
 }
 function resetSpins(){
   spinsLeft = +document.getElementById('spins-per-day').value || settings.spinsPerDay;
@@ -2191,32 +2378,110 @@ function resetSpins(){
   document.getElementById('start-btn').innerText = "スピン開始!";
   document.getElementById('start-btn').disabled = false;
   updateHeader();
-  alert(`🤫 パパの魔法で回数が${spinsLeft}回にリセットされました!`);
+  notify(`🤫 回数が ${spinsLeft}回に リセットされました!`);
 }
 function clearHistory(){
-  if (confirm("今日の記録と合計金額をすべて消しますか?")) {
+  askConfirm("今日の記録と 合計を すべて消しますか?\n（もとに もどせません）", () => {
     history = []; totals = blankTotals();
     store.history = history; store.totals = totals; saveStore();
     renderHistory(); renderCollection(); updateHeader();
-  }
+    notify('記録を すべて消しました');
+  }, '消す');
 }
 function changePin(){
   const p = document.getElementById('parent-code').value.trim();
-  if (p.length < 4) { alert("4文字以上にしてください"); return; }
+  if (p.length < 4) { notify("4文字以上に してください"); return; }
   store.pin = p; saveStore();
   document.getElementById('parent-code').value = "";
-  alert("PINを変更しました");
+  notify("あいことばを 変更しました");
 }
 function saveSettings(){
   settings.spinsPerDay = +document.getElementById('spins-per-day').value || 20;
   settings.missions = settings.missions.map(s => String(s).trim()).filter(s => s);
   if (settings.missions.length === 0) settings.missions = [...DEFAULT_MISSIONS];
-  if (settings.lines.length === 0) { alert("路線が1つも選ばれていません!"); return; }
-  if (settings.areas.length === 0) { alert("エリアが1つも選ばれていません!"); return; }
+  if (settings.lines.length === 0) { notify("路線が 1つも 選ばれていません!"); return; }
+  if (settings.areas.length === 0) { notify("エリアが 1つも 選ばれていません!"); return; }
   missionBag = []; // 指令が変わったのでシャッフルバッグを作り直し
   persistSettings();
   updateHeader();
   switchTab('play');
+}
+
+/* =========================================================
+   バックアップ
+   端末の中だけで完結する。外部へは一切送らない。
+   ファイルの保存が効かない環境（一部のiOS PWAなど）でも
+   コピペで持ち出せるように、文字列も同時に出す。
+   ========================================================= */
+const BACKUP_TAG = 'mqgo-backup';
+
+function backupText() {
+  return JSON.stringify({
+    tag: BACKUP_TAG, ver: APP_VER, at: new Date().toISOString(),
+    store: store
+  });
+}
+function exportData() {
+  const text = backupText();
+  const box = document.getElementById('backup-box');
+  if (box) box.value = text;
+  /* ファイルとして落とせる環境なら落とす。だめでも上の文字列が残る */
+  let saved = false;
+  try {
+    const blob = new Blob([text], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chikatetsu-quest-${todayKey()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    saved = true;
+  } catch (e) {}
+  const note = document.getElementById('backup-note');
+  if (note) note.textContent = saved
+    ? 'ファイルに保存しました。上の文字列をコピーして残しておくこともできます。'
+    : '上の文字列をすべてコピーして、メモなどに残してください。';
+  notify(saved ? '書き出しました' : '上の文字列をコピーして残してください', 3400);
+}
+
+/* 読み込みは上書きなので、必ず1回確認する */
+function openImport() {
+  const box = document.getElementById('backup-box');
+  const raw = box ? box.value.trim() : '';
+  if (!raw) { notify('先に、バックアップの文字列を 貼りつけてください'); return; }
+  const data = parseBackup(raw);
+  if (!data) { notify('バックアップの形式ではないようです。\n文字列がすべて入っているか 確かめてください', 3600); return; }
+  const hist = (data.store.history || []).length;
+  askConfirm(
+    `いまの記録を すべて置きかえます。\n\n読み込む記録: ${hist}件\n\nもとに もどせません。よろしいですか?`,
+    () => applyBackup(data), '読み込む');
+}
+/* 壊れた文字列でアプリを起動不能にしないよう、ここで形を確かめる */
+function parseBackup(raw) {
+  try {
+    const d = JSON.parse(raw);
+    if (!d || d.tag !== BACKUP_TAG || !d.store || typeof d.store !== 'object') return null;
+    if (!Array.isArray(d.store.history)) return null;
+    return d;
+  } catch (e) { return null; }
+}
+function applyBackup(data) {
+  store = Object.assign(blankStore(), data.store);
+  saveStore();
+  /* 画面の状態も作り直す。読み込み後にリロードを求めないで済むように */
+  settings = loadSettings();
+  history = store.history;
+  excludedStations = store.excluded || [];
+  totals = migrateTotals(store);
+  store.totals = totals;
+  spinsLeft = store.spinsLeft ?? settings.spinsPerDay;
+  missionBag = [];
+  saveStore();
+  renderHistory(); renderCollection(); renderExcluded();
+  updateHeader(); updateSummary(); updateStartBtn();
+  const box = document.getElementById('backup-box');
+  if (box) box.value = '';
+  notify(`読み込みました（記録 ${history.length}件）`, 3400);
 }
 
 /* --- 注意事項パネル --- */
