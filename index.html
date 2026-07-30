@@ -384,7 +384,7 @@
   /* 達成した駅。⭐がつく */
   .cl-st.got { color:#fff; border-color:transparent; font-weight:bold; }
   /* 手で「行った」にした駅。塗るが、達成とは見分けられるようにする */
-  .cl-st.marked { color:#e8eef6; border-style:dashed; background:#1b2740; }
+  .cl-st.marked { color:#5a6a82; border-style:dashed; background:#0d1526; }
   #collect-note { font-size:0.72em; color:#8395a7; text-align:center; margin-top:7px; line-height:1.5; }
   #backup-box {
     width:100%; box-sizing:border-box; font-size:0.7em; font-family:monospace;
@@ -393,6 +393,7 @@
   }
   #backup-note { min-height:1em; }
   #hide-visited-row { text-align:center; margin-top:11px; }
+  #excluded-list { margin-top:8px; }
   #hv-btn.off { background:#3a4358; }
   #hv-note { font-size:0.72em; color:#8395a7; margin-top:5px; line-height:1.5; }
 
@@ -698,15 +699,10 @@
     <h3>🗺️ 行った駅コレクション</h3>
     <div id="collect-total"></div>
     <div id="collect-lines"></div>
-    <div id="hide-visited-row">
-      <button class="small-btn" id="hv-btn" onclick="toggleHideVisited()"></button>
-      <div id="hv-note"></div>
-    </div>
     <div id="collect-note">
-      ⭐ = このアプリで達成した駅　／　✓ = 手でつけた印<br>
-      駅名をタップすると、印を つけたり けしたり できます。
+      ⭐ = このアプリで達成した駅　／　✓ = おうちの人がつけた印<br>
+      印をつけたり けしたりは ⚙️せってい からできます。
     </div>
-    <div id="excluded-list" style="display:none"></div>
   </div>
 
   <!-- ============ 保護者設定 ============ -->
@@ -729,14 +725,23 @@
     </div>
 
     <div class="sec">
-      <h4>🚫 事前除外(駅を選んで除外)</h4>
-      <div class="note">路線を選ぶと駅一覧が出ます。タップで除外⇔解除を切り替え。</div>
+      <h4>🚫 行った駅の印（事前除外）</h4>
+      <div class="note">
+        路線を選ぶと駅一覧が出ます。タップで 印をつける⇔けす。<br>
+        ここでつけた印は、📖きろく の「行った駅コレクション」に ✓ で出ます。
+        コレクション側は見るだけで、つけ外しはここだけでできます。
+      </div>
       <div class="edit-row">
         <select id="line-pick" onchange="renderLineStations()" style="flex-grow:1;"></select>
       </div>
       <div id="line-station-list"></div>
-      <div style="text-align:center;">
-        <button class="small-btn" onclick="resetExcluded()" style="background:#3498db;">除外をすべて解除</button>
+      <div id="excluded-list"></div>
+      <div id="hide-visited-row">
+        <button class="small-btn" id="hv-btn" onclick="toggleHideVisited()"></button>
+        <div id="hv-note"></div>
+      </div>
+      <div style="text-align:center; margin-top:9px;">
+        <button class="small-btn" onclick="askResetExcluded()" style="background:#3498db;">印をすべて けす</button>
       </div>
     </div>
 
@@ -1147,7 +1152,7 @@ function stationByMeetCode(code) {
      同一オリジンに家族版の旧キーが残っている可能性があり、
      拾うと他アプリのデータを取り込んでしまうため。
    ========================================================= */
-const APP_VER = 'v17';
+const APP_VER = 'v18';
 const APP_KEY = 'mqgo_v1';
 
 /* 累計は種類ごとに分けて持つ。
@@ -1254,23 +1259,24 @@ function nextRunningReel() {
 /* 景色は「いまの時刻」で決まる。画面が勝手に暗くなることで、
    保護者が「そろそろ帰ろう」と言いやすくなる（これが主目的）。
    sky=空のグラデ(2〜4色) / ground=地面 / rail=線路 /
+   body=木の色 / bldg=ビルの色（分けないと昼のビルが緑になる） /
    kinds=脇を通り過ぎるもの(pole 電柱 / tree 木 / bldg ビル / lamp 天井灯) */
 const SCENES = [
   { key:'morning', cls:'sc-morning', tag:'🌅 あさ',
     sky:['#ffb877','#ffe2b4','#c8e7ff','#e4f4ff'], ground:'#7ba85e', rail:'#9a8f7d',
-    body:'#4a8f42', accent:'#fff6dc', kinds:['tree','pole','bldg'] },
+    body:'#4a8f42', bldg:'#c2ac94', accent:'#fff6dc', kinds:['tree','pole','bldg'] },
   { key:'day', cls:'sc-day', tag:'☀️ ひる',
     sky:['#2f9ae6','#79c5f2','#cfeaff'], ground:'#6fa855', rail:'#9a8f7d',
-    body:'#3f8339', accent:'#ece6d8', kinds:['tree','pole','bldg'] },
+    body:'#3f8339', bldg:'#9fb0c0', accent:'#ece6d8', kinds:['tree','pole','bldg'] },
   { key:'dusk', cls:'sc-dusk', tag:'🌆 ゆうがた',
     sky:['#ff8a3d','#ff6b5c','#a05a9c','#553a86'], ground:'#4a4060', rail:'#6b6076',
-    body:'#2e2444', accent:'#ffd98a', kinds:['bldg','pole','tree'] },
+    body:'#2e2444', bldg:'#3a2c50', accent:'#ffd98a', kinds:['bldg','pole','tree'] },
   { key:'night', cls:'sc-night', tag:'🌙 よる',
     sky:['#05081a','#0c1734','#1d2c56'], ground:'#101828', rail:'#3d4a68',
-    body:'#141d33', accent:'#ffe9a8', kinds:['bldg','pole'], stars:true },
+    body:'#141d33', bldg:'#18233d', accent:'#ffe9a8', kinds:['bldg','pole'], stars:true },
   { key:'under', cls:'sc-under', tag:'🚇 ちかてつ',
     sky:['#0d1730','#060a16'], ground:'#151d33', rail:'#4a5a7e',
-    body:'#33456e', accent:'#ffe9b0', kinds:['lamp','pole'] }
+    body:'#33456e', bldg:'#33456e', accent:'#ffe9b0', kinds:['lamp','pole'] }
 ];
 
 /* 時刻 → 景色。境目は 5時 / 9時 / 16時 / 18時半 */
@@ -1340,6 +1346,34 @@ const FOCAL = 260;      /* 焦点距離。大きいほど望遠 */
 const Z_NEAR = 12;      /* これより手前に来たら奥へ戻す */
 const Z_FAR  = 620;
 
+/* #rrggbb を暗く（明るく）する。t<1 で暗くなる */
+function shade(hex, t) {
+  const v = i => {
+    const n = Math.round(parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) * t);
+    return Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0');
+  };
+  return '#' + v(0) + v(1) + v(2);
+}
+/* 天井灯だけは散らさない。奥へ続く1列にそろえる */
+function placeObj(o) {
+  if (o.kind === 'lamp') { o.x = o.side * 46; o.hh = 132; o.ww = 30; }
+}
+/* 種から 0〜1 の決まった値を出す。同じ (seed,i) なら必ず同じ値になるので、
+   窓の点き方がフレームごとに変わらない */
+function seedRand(seed, i) {
+  let x = (seed + i * 374761393) | 0;
+  x = Math.imul(x ^ (x >>> 15), 2246822519);
+  x = Math.imul(x ^ (x >>> 13), 3266489917);
+  return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+}
+/* #rrggbb を 2色まぜる */
+function mixHex(a, b, t) {
+  const p = s => [parseInt(s.slice(1,3),16), parseInt(s.slice(3,5),16), parseInt(s.slice(5,7),16)];
+  const A = p(a), B = p(b);
+  const v = i => Math.round(A[i] + (B[i] - A[i]) * t);
+  return `rgb(${v(0)},${v(1)},${v(2)})`;
+}
+
 function cabResize() {
   const cv = CAB.cv; if (!cv) return;
   const r = cv.getBoundingClientRect();
@@ -1366,8 +1400,12 @@ function cabSeed() {
       x: side * (70 + Math.random() * 90),
       z: Z_NEAR + (i / 26) * (Z_FAR - Z_NEAR) + Math.random() * 18,
       hh: 60 + Math.random() * 90,      /* 高さ */
-      ww: 22 + Math.random() * 30       /* 幅 */
+      ww: 22 + Math.random() * 30,      /* 幅 */
+      /* 窓の点き方を決める種。毎フレーム乱数を引くと窓が瞬いてしまう */
+      seed: (Math.random() * 1e9) | 0,
+      roof: Math.random()               /* 屋上の形 */
     });
+    placeObj(CAB.objs[CAB.objs.length - 1]);
   }
 }
 
@@ -1451,6 +1489,9 @@ function drawCab(dt) {
       o.x = o.side * (70 + Math.random() * 90);
       o.hh = 60 + Math.random() * 90;
       o.ww = 22 + Math.random() * 30;
+      o.seed = (Math.random() * 1e9) | 0;   /* 使い回すので、種も引き直す */
+      o.roof = Math.random();
+      placeObj(o);
     }
   }
   const sorted = objs.slice().sort((a, b) => b.z - a.z);
@@ -1460,29 +1501,89 @@ function drawCab(dt) {
     const k = FOCAL / o.z;
     const hh = o.hh * k, ww = Math.max(1, o.ww * k);
     if (sx < -ww * 2 || sx > W + ww * 2) continue;
-    c.globalAlpha = Math.min(1, Math.max(0.15, 1.2 - o.z / Z_FAR));
+    /* 奥行きは下の霞みで出す。ここでの透明度は、いちばん奥から
+       ぬるっと現れるためだけに使う（前は二重にかかって全部が透けていた） */
+    c.globalAlpha = Math.min(1, Math.max(0, (Z_FAR - o.z) / (Z_FAR * 0.3)));
+    /* 遠いものほど空の色に溶かす。これがいちばん奥行きに効く */
+    const haze = Math.min(0.72, (o.z / Z_FAR) * 0.85);
+    const far  = sc.sky[sc.sky.length - 1];
 
     if (o.kind === 'pole') {
-      c.fillStyle = sc.accent;
-      c.fillRect(sx - Math.max(1, ww * 0.10), base - hh, Math.max(1, ww * 0.20), hh);
-      c.fillRect(sx - ww * 0.45, base - hh, ww * 0.9, Math.max(1, hh * 0.045));
+      /* 横木が幅いっぱいだと、遠目に十字架に見えてしまう。
+         短めの腕を2本にして、電柱らしくする。
+         色は accent（ランプの色）ではなく影。前は夜に電柱が金色に光って
+         街より目立ってしまっていた */
+      c.fillStyle = mixHex(shade(sc.bldg || sc.body, 0.5), far, haze * 0.8);
+      const pw = Math.max(1, ww * 0.12);
+      c.fillRect(sx - pw / 2, base - hh, pw, hh);
+      const armW = ww * 0.5, armH = Math.max(0.8, hh * 0.028);
+      c.fillRect(sx - armW / 2, base - hh + hh * 0.04, armW, armH);
+      c.fillRect(sx - armW * 0.36, base - hh + hh * 0.14, armW * 0.72, armH);
     } else if (o.kind === 'tree') {
-      c.fillStyle = '#6b4a2a';
+      c.fillStyle = mixHex('#6b4a2a', far, haze);
       c.fillRect(sx - Math.max(1, ww * 0.09), base - hh * 0.42, Math.max(1, ww * 0.18), hh * 0.42);
-      c.fillStyle = sc.body;
+      c.fillStyle = mixHex(sc.body, far, haze);
       c.beginPath(); c.arc(sx, base - hh * 0.62, Math.max(1, ww * 0.62), 0, Math.PI * 2); c.fill();
     } else if (o.kind === 'bldg') {
-      c.fillStyle = sc.body;
-      c.fillRect(sx - ww / 2, base - hh, ww, hh);
-      c.fillStyle = sc.accent;
-      const cols = Math.max(1, Math.floor(ww / 9)), rows = Math.max(1, Math.floor(hh / 13));
-      for (let a = 0; a < cols; a++) for (let b = 0; b < rows; b++) {
-        if ((a + b) % 3) continue;
-        c.fillRect(sx - ww / 2 + 3 + a * 9, base - hh + 5 + b * 13, Math.max(1, ww * 0.10), Math.max(1, hh * 0.05));
+      /* 遠いものほど空の色に溶かす。これがいちばん奥行きに効く */
+      const left = sx - ww / 2, top = base - hh;
+      const bc = sc.bldg || sc.body;
+
+      /* 正面と、線路側を向いた側面。2面あるだけで箱に見える */
+      const litSide = o.side < 0 ? 1 : -1;
+      const depth = ww * 0.26;
+      c.fillStyle = mixHex(bc, far, haze);
+      c.fillRect(left, top, ww, hh);
+      c.fillStyle = mixHex(shade(bc, 0.62), far, haze);
+      c.beginPath();
+      const ex = litSide > 0 ? left + ww : left;
+      c.moveTo(ex, top); c.lineTo(ex + depth * litSide, top + hh * 0.045);
+      c.lineTo(ex + depth * litSide, base); c.lineTo(ex, base);
+      c.closePath(); c.fill();
+
+      /* 屋上。給水塔やペントハウスがあるだけで、平らな棒でなくなる */
+      if (o.roof > 0.55) {
+        const rw = ww * (0.22 + o.roof * 0.2), rh = hh * 0.07;
+        c.fillStyle = mixHex(bc, far, haze);
+        c.fillRect(sx - rw / 2, top - rh, rw, rh);
+      } else if (o.roof > 0.34) {
+        c.fillStyle = mixHex(shade(bc, 0.8), far, haze);
+        c.fillRect(sx - Math.max(0.6, ww * 0.03), top - hh * 0.16, Math.max(1, ww * 0.06), hh * 0.16);
+      }
+
+      /* 窓。遠近で縮むように、実寸(k)から桁数を決める。
+         前は固定9pxで、遠くのビルも近くのビルも窓が同じ大きさだった */
+      const cw = 7 * k, ch = 9 * k;                 /* 窓1つぶんの間隔 */
+      if (cw >= 1.4) {
+        const cols = Math.max(1, Math.round(ww / cw));
+        const rows = Math.max(1, Math.round(hh / ch));
+        const gapX = ww / cols, gapY = hh / rows;
+        const wW = Math.max(0.8, gapX * 0.52), wH = Math.max(0.8, gapY * 0.46);
+        /* 夜は多めに、昼は少なめに点ける */
+        const lit = sc.key === 'night' ? 0.5 : (sc.key === 'dusk' ? 0.34 : 0.2);
+        const alpha = c.globalAlpha;
+        for (let a = 0; a < cols; a++) for (let b = 0; b < rows; b++) {
+          const r = seedRand(o.seed, a * 31 + b * 7);
+          if (r > lit) continue;
+          /* 点いた窓ほど、霞の影響を受けにくくする（灯りは遠くても見える） */
+          c.globalAlpha = alpha * (0.55 + r / lit * 0.45);
+          c.fillStyle = sc.accent;
+          c.fillRect(left + a * gapX + (gapX - wW) / 2, top + b * gapY + (gapY - wH) / 2, wW, wH);
+        }
+        c.globalAlpha = alpha;
       }
     } else if (o.kind === 'lamp') {
+      /* 天井から吊るす。灯り本体と、その下のぼんやりした光 */
+      const ly = base - hh * 1.55, lh = Math.max(1, hh * 0.05);
+      c.fillStyle = mixHex(shade(sc.bldg || sc.body, 0.7), far, haze * 0.6);
+      c.fillRect(sx - Math.max(0.6, ww * 0.03), ly - hh * 0.1, Math.max(1, ww * 0.06), hh * 0.1);
       c.fillStyle = sc.accent;
-      c.fillRect(sx - ww * 0.5, base - hh * 1.55, ww, Math.max(1, hh * 0.05));
+      c.fillRect(sx - ww * 0.5, ly, ww, lh);
+      const g = c.createRadialGradient(sx, ly + lh, 0, sx, ly + lh, ww * 1.1);
+      g.addColorStop(0, 'rgba(255,233,176,0.30)');
+      g.addColorStop(1, 'rgba(255,233,176,0)');
+      c.fillStyle = g;
+      c.beginPath(); c.arc(sx, ly + lh, ww * 1.1, 0, Math.PI * 2); c.fill();
     }
   }
   c.globalAlpha = 1;
@@ -1601,7 +1702,7 @@ function getCandidates(ignoreExclude=false) {
   const areas = new Set(settings.areas);
   /* 行った駅を外すかどうかは設定しだい。外した結果0駅になるなら外さない
      （「候補が0で回せない」より「同じ駅がまた出る」ほうがまだよい） */
-  const hide = !ignoreExclude && settings.hideVisited !== false;
+  const hide = !ignoreExclude && hideOn();
   const base = Object.values(STATIONS).filter(st =>
     areas.has(st.area) && st.lines.some(l => sel.has(l))
   );
@@ -2019,13 +2120,24 @@ function ticketHTML(h) {
     `<span class="lc" style="background:${LINES[l].c}">${esc(LINES[l].n)}</span>`).join('');
   return `<div class="ticket" style="--tc:${tint}">` +
     `<div class="tk-top"><span class="tk-station">${esc(h.station)}</span>` +
-    `<span class="tk-time">${esc(h.time || '')}</span></div>` +
+    `<span class="tk-time">${esc(ticketWhen(h))}</span></div>` +
     (badges ? `<div class="tk-lines">${badges}</div>` : '') +
     `<div class="tk-mission">${esc(h.mission)}</div>` +
     `<div class="tk-foot"><span class="tk-who">${esc(h.target)}</span>` +
     `<span class="tk-reward">${esc(h.money)}</span></div>` +
     `</div>`;
 }
+/* きっぷに出す日時。今日のぶんは時刻だけ、それより前は日付もつける
+   （その日の中では時刻だけのほうが読みやすいため） */
+function ticketWhen(h) {
+  const t = h.time || '';
+  if (!h.date) return t;
+  if (h.date === todayKey()) return t;
+  const p = String(h.date).split('-');
+  if (p.length !== 3) return t;
+  return `${+p[1]}/${+p[2]}${t ? ' ' + t : ''}`;
+}
+
 function renderHistory() {
   const list = document.getElementById('history-list');
   if (history.length === 0) {
@@ -2046,6 +2158,7 @@ function stationsOfLine(l) {
 
 /* 「行った駅を出さない」の切りかえ。
    ⭐も✓も同じ「行った」なので、まとめてこの1つが効く */
+function hideOn() { return settings.hideVisited !== false; }
 function toggleHideVisited() {
   settings.hideVisited = settings.hideVisited === false;
   persistSettings();
@@ -2058,7 +2171,7 @@ function renderHideVisited() {
   const b = document.getElementById('hv-btn');
   const t = document.getElementById('hv-note');
   if (!b || !t) return;
-  const on = settings.hideVisited !== false;
+  const on = hideOn();
   b.textContent = on ? '🚫 行った駅は 出さない' : '🔁 行った駅も 出す';
   b.classList.toggle('off', !on);
   t.innerHTML = on
@@ -2096,8 +2209,7 @@ function renderCollection() {
       const cls = isGot ? 'cl-st got' : (isMk ? 'cl-st marked' : 'cl-st');
       const style = isGot ? ` style="background:${c}"` : '';
       const mark = isGot ? ' ⭐' : (isMk ? ' ✓' : '');
-      return `<span class="${cls}"${style} onclick="toggleExcludeStation('${esc(nm)}')">` +
-             `${esc(nm)}${mark}</span>`;
+      return `<span class="${cls}"${style}>${esc(nm)}${mark}</span>`;
     }).join('');
     /* 畳んでおく。進捗（バーと n/m）は summary 側に置くので、
        全部閉じたままでも「どの路線をどれだけ回ったか」は一覧できる */
@@ -2118,28 +2230,40 @@ function renderExcluded() {
   const box = document.getElementById('excluded-list');
   if (box) {
     box.innerHTML = excludedStations.length === 0
-      ? "除外中の駅:なし"
+      ? "印のついた駅:なし"
       : excludedStations.map(s =>
           `<span class="excluded-tag" onclick="removeExcluded('${esc(s)}')">${esc(s)} ✕</span>`
         ).join('');
   }
+  renderLineStations();   /* 路線を選び直さないと消えなかったので、ここで描き直す */
   renderCollection();
+  renderHideVisited();
 }
 
 /* =========================================================
    8. 除外操作
    ========================================================= */
-function addExclude(st) {
+function addExclude(st, quiet) {
   if (!excludedStations.includes(st)) {
     excludedStations.push(st);
     store.excluded = excludedStations; saveStore();
     renderExcluded(); updateSummary();
+    /* 押した結果どうなったのかを、その場で伝える */
+    if (!quiet) notify(`「${st}」に印をつけました${hideOn() ? '（ルーレットに出ません）' : ''}`);
   }
 }
-function removeExcluded(st) {
+function removeExcluded(st, quiet) {
+  if (!excludedStations.includes(st)) return;
   excludedStations = excludedStations.filter(s => s !== st);
   store.excluded = excludedStations; saveStore();
   renderExcluded(); updateSummary();
+  if (!quiet) notify(`「${st}」の印を けしました`);
+}
+/* 全部消すのは取り消せないので、必ず1回確認する */
+function askResetExcluded() {
+  if (excludedStations.length === 0) { notify('印のついた駅は ありません'); return; }
+  askConfirm(`印のついた ${excludedStations.length}駅を すべて けしますか?`,
+             () => { resetExcluded(); notify('印を すべて けしました'); }, 'けす');
 }
 function resetExcluded() {
   excludedStations = [];
@@ -2162,7 +2286,6 @@ function renderLineStations() {
 }
 function toggleExcludeStation(name) {
   if (excludedStations.includes(name)) removeExcluded(name); else addExclude(name);
-  renderLineStations();
 }
 
 /* =========================================================

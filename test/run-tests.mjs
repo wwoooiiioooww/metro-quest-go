@@ -1932,6 +1932,162 @@ console.log('\n[50] バックアップ');
   w.close();
 }
 
+/* ---------- 51. きっぷに日付を入れる ---------- */
+/* きっぷが何日ぶんも並ぶので、時刻だけだと どれがいつのものか分からない */
+console.log('\n[51] きっぷの日時');
+{
+  const today = new Date();
+  const key = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const st = { settings:null, spinsLeft:5, noticeSeen:true, totals:{stamp:9,money:0}, excluded:[],
+    history:[
+      { station:'上野', mission:'m', money:'⭐3こ', target:'みんな', date:key,          time:'15:40' },
+      { station:'根津', mission:'m', money:'⭐3こ', target:'みんな', date:'2026-07-12', time:'09:05' },
+      { station:'月島', mission:'m', money:'⭐3こ', target:'みんな',                     time:'11:00' },
+      { station:'白山', mission:'m', money:'⭐3こ', target:'みんな', date:'こわれた',    time:'08:00' }] };
+  const { w, errors } = boot({ mqgo_v1: JSON.stringify(st) });
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  const times = [...w.document.querySelectorAll('.ticket')].map(t => t.querySelector('.tk-time').textContent);
+  eq(times[0], '15:40', '今日のぶんは時刻だけ');
+  eq(times[1], '7/12 09:05', '前の日は日付もつく');
+  eq(times[2], '11:00', '日付がない古い記録でも落ちない');
+  eq(times[3], '08:00', '日付が壊れていても落ちない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 52. コレクションは見るだけ ---------- */
+/* きろくタブは子どもの画面。役割は達成を褒めること。
+   そこでタップするとルーレットのルールが黙って変わるのは噛み合わない。
+   除外はルールを決める操作なので、保護者モードに寄せた */
+console.log('\n[52] コレクションは見るだけ');
+{
+  const st = { settings:null, spinsLeft:5, noticeSeen:true, totals:{stamp:3,money:0}, excluded:['浅草'],
+    history:[{ station:'上野', mission:'m', money:'⭐3こ', target:'みんな', time:'9:00' }] };
+  const { w, errors } = boot({ mqgo_v1: JSON.stringify(st) });
+  w.eval('hideSplash()'); w.eval('closeNotice()'); w.eval('switchTab("log")');
+  const chips = [...w.document.querySelectorAll('.cl-st')];
+  ok(chips.length > 0, '駅チップが出ている');
+  eq(chips.filter(c => c.getAttribute('onclick')).length, 0, 'タップしても何も起きない');
+
+  /* タップで開いた路線が閉じてしまう問題も、これで起きない */
+  const line = w.document.querySelector('.cl-line');
+  line.open = true;
+  const chip = line.querySelector('.cl-st');
+  chip.dispatchEvent(new w.Event('click', { bubbles: true }));
+  eq(line.open, true, '駅を押しても路線が閉じない');
+
+  /* ✓ が ⭐ より目立たないこと。前は白で、達成した駅より目立っていた */
+  const marked = chips.find(c => c.className.includes('marked'));
+  const plain  = chips.find(c => c.className === 'cl-st');
+  const got    = chips.find(c => c.className.includes('got'));
+  ok(marked && plain && got, '3種類そろっている');
+  eq(w.getComputedStyle(marked).color, w.getComputedStyle(plain).color, '✓ の文字色は ふつうの駅と同じ');
+  ok(w.getComputedStyle(got).color !== w.getComputedStyle(plain).color, '⭐ だけが目立つ');
+  ok(marked.textContent.includes('✓'), '✓ はついている');
+
+  /* 切りかえスイッチは保護者モードへ移した */
+  eq(w.document.getElementById('hv-btn').closest('.tab-pane').id, 'tab-set', 'スイッチは保護者モードにある');
+  ok(w.document.getElementById('collect-note').textContent.includes('せってい'), 'どこで変えられるか書いてある');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 53. 保護者モードの除外 ---------- */
+console.log('\n[53] 保護者モードの除外');
+{
+  const st = { settings:null, spinsLeft:5, noticeSeen:true, totals:{stamp:0,money:0}, excluded:['浅草'], history:[] };
+  const { w, notices, dlgOk, dlgOpen, dlgText, errors } = boot({ mqgo_v1: JSON.stringify(st) });
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  w.eval('renderSettings()');
+  w.document.getElementById('line-pick').value = 'G';
+  w.eval('renderLineStations()');
+  const marks = () => [...w.document.querySelectorAll('#line-station-list .chip.excluded')]
+                        .map(c => c.textContent.replace(' ✕', ''));
+  eq(marks().join(','), '浅草', 'すでにある印が出る');
+
+  w.eval('toggleExcludeStation("渋谷")');
+  ok(marks().includes('渋谷'), '押した駅に印がつく');
+  ok(notices().some(a => a.includes('渋谷') && a.includes('印をつけました')), '何が起きたか伝える');
+  ok(notices().some(a => a.includes('出ません')), 'ルーレットに出なくなることも伝える');
+
+  /* ✕ タグから消したとき、路線を選び直さないと画面から消えなかった */
+  w.eval('removeExcluded("浅草")');
+  ok(!marks().includes('浅草'), '✕ で消したら、駅一覧からもその場で消える');
+  ok(w.document.getElementById('excluded-list').textContent.includes('渋谷'), 'タグ一覧も更新される');
+  ok(notices().some(a => a.includes('けしました')), '消したことも伝える');
+
+  /* 全部消すのは取り消せないので確認する */
+  w.eval('askResetExcluded()');
+  ok(dlgOpen(), '全消しの前に確認する');
+  ok(dlgText().includes('1駅'), '何駅消すのか伝える');
+  dlgOk();
+  eq(w.eval('excludedStations.length'), 0, '消える');
+  eq(marks().length, 0, '駅一覧からも消える');
+  w.eval('askResetExcluded()');
+  ok(!dlgOpen(), '消すものがなければ確認も出さない');
+
+  /* スイッチを切ったら「出ません」と言わない */
+  w.eval('toggleHideVisited()');
+  w.eval('toggleExcludeStation("上野")');
+  const last = notices()[notices().length - 1];
+  ok(last.includes('印をつけました') && !last.includes('出ません'),
+     '出す設定のときは「出ません」と言わない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 除外の入り口が保護者モードだけになっていること（回帰防止） */
+  const { w } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  const log = w.document.getElementById('tab-log');
+  eq(log.querySelectorAll('[onclick*="Exclude"]').length, 0, 'きろくタブに除外の入り口はない');
+  const set = w.document.getElementById('tab-set');
+  ok(set.querySelector('#line-station-list'), '保護者モードに駅一覧がある');
+  ok(set.textContent.includes('コレクション'), 'コレクションとの関係が書いてある');
+  w.close();
+}
+
+/* ---------- 54. 車窓 ---------- */
+/* ビルが電柱に見えていた。窓の格子が固定ピクセルで遠近に追従せず、
+   点灯も斜め縞だった。色も木と共用で、昼のビルが緑になっていた */
+console.log('\n[54] 車窓');
+{
+  const { w, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+
+  /* 窓の点き方が毎フレーム変わると、窓がちらちら瞬いてしまう */
+  const a = w.eval('[0,1,2,3,4].map(i => seedRand(12345, i))');
+  const b = w.eval('[0,1,2,3,4].map(i => seedRand(12345, i))');
+  eq(a.join(','), b.join(','), '同じ種なら同じ模様（窓が瞬かない）');
+  const c2 = w.eval('[0,1,2,3,4].map(i => seedRand(999, i))');
+  ok(c2.join(',') !== a.join(','), '種が違えば模様も違う');
+  ok(a.every(v => v >= 0 && v < 1), '0以上1未満におさまる');
+
+  /* 木の色をビルに使い回していたので、昼のビルが緑だった */
+  const scenes = w.eval('SCENES.map(s => ({ key:s.key, bldg:s.bldg, body:s.body }))');
+  for (const s of scenes) {
+    ok(/^#[0-9a-f]{6}$/i.test(s.bldg || ''), `${s.key}: ビルの色が決まっている`);
+  }
+  const day = scenes.find(s => s.key === 'day');
+  ok(day.bldg !== day.body, 'ひるのビルは木と別の色');
+
+  eq(w.eval('mixHex("#000000", "#ffffff", 0)'), 'rgb(0,0,0)', 'まぜる: 0なら元の色');
+  eq(w.eval('mixHex("#000000", "#ffffff", 1)'), 'rgb(255,255,255)', 'まぜる: 1なら相手の色');
+  eq(w.eval('shade("#808080", 0.5)'), '#404040', '暗くできる');
+  eq(w.eval('shade("#ffffff", 2)'), '#ffffff', '明るくしすぎても壊れない');
+
+  /* 天井灯は散らさず、奥へ続く1列にそろえる */
+  w.eval('curScene = sceneByKey("under"); cabSeed()');
+  const lamps = w.eval('CAB.objs.filter(o => o.kind === "lamp").map(o => Math.abs(o.x))');
+  ok(lamps.length > 0, 'ちかてつには天井灯が出る');
+  ok(lamps.every(v => v === lamps[0]), '天井灯は左右そろっている');
+
+  /* canvas が無い環境でも落ちないこと（jsdomは canvas 非対応） */
+  w.eval('drawCab(0.05)');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
 /* ---------- 結果 ---------- */
 console.log(`\n${'='.repeat(46)}`);
 console.log(`  passed: ${passed}  failed: ${failed}`);
