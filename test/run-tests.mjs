@@ -579,7 +579,7 @@ console.log('\n[16] 画面下タブ');
 {
   const { w, errors } = boot();
   ok(w.document.getElementById('tabbar'), 'タブバーがある');
-  eq(w.document.querySelectorAll('#tabbar button').length, 3, 'タブは3つ');
+  eq(w.document.querySelectorAll('#tabbar button').length, 4, 'タブは4つ（あそぶ/あそびかた/きろく/せってい）');
   ok(w.document.getElementById('tab-play').classList.contains('on'), '起動時は「あそぶ」タブ');
   w.eval('switchTab("log")');
   ok(w.document.getElementById('tab-log').classList.contains('on'), 'きろくタブに切り替わる');
@@ -2099,6 +2099,89 @@ const SCENE_KEYS = ['morning','day','dusk','night','under'];
   /* canvas が無い環境でも落ちないこと（jsdomは canvas 非対応） */
   w.eval('drawCab(0.05)');
   eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 55. あそびかた ---------- */
+/* 読み手が違うので置き場所も分ける。
+   子ども＝タブ（読まずに直感で覚えるので、目につくことが大事）
+   大人  ＝せっての中（読むのは面倒だが、詰まったときに必要になる） */
+console.log('\n[55] あそびかた');
+{
+  const { w, errors } = boot();
+  const d = w.document;
+  ok(d.getElementById('tab-howto'), 'あそびかたタブがある');
+  ok(d.getElementById('nav-howto'), 'ナビにボタンがある');
+  eq(w.eval('JSON.stringify(TABS)'), '["play","howto","log","set"]', 'あそぶ の となりに置く');
+
+  /* 子ども向け：5つの手順が順番に並んでいること */
+  const steps = [...d.querySelectorAll('#tab-howto .hw-step')];
+  eq(steps.length, 5, '手順は5つ');
+  eq(steps.map(s => s.querySelector('.hw-num').textContent).join(''), '12345', '番号がふってある');
+  const txt = d.getElementById('tab-howto').textContent;
+  ok(txt.includes('はっしゃ'), 'はっしゃ から始まる');
+  ok(txt.includes('ブレーキ'), 'ブレーキの説明がある');
+  ok(txt.includes('たっせい'), 'たっせいで終わる');
+  /* 指令を義務にすると、できない日が失敗になってしまう */
+  ok(txt.includes('パス'), 'むずかしければパスしてよいと書いてある');
+
+  /* 読み終わったら、そのまま遊びに行ける */
+  w.eval('switchTab("howto")');
+  ok(d.getElementById('tab-howto').classList.contains('on'), 'タブを開ける');
+  d.getElementById('howto-go').dispatchEvent(new w.Event('click', { bubbles: true }));
+  ok(d.getElementById('tab-play').classList.contains('on'), 'ボタンで あそぶ に戻れる');
+
+  /* 大人向け：設定の中。畳んであって、要るときだけ開く */
+  const pg = d.getElementById('parent-guide');
+  ok(pg, 'おうちの人へ がある');
+  eq(pg.closest('.tab-pane').id, 'tab-set', '置き場所は せってい の中');
+  eq(pg.open, false, '畳んである');
+  eq(pg.querySelectorAll('li').length, 5, '設定する順番が5つ');
+  ok(pg.textContent.includes('1234'), 'あいことばの初期値を書いてある');
+  ok(pg.textContent.includes('バックアップ'), 'バックアップにも触れている');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* はじめての人：はじめる前に → あそびかた → あそぶ の順に案内する */
+  const { w } = boot();
+  w.eval('hideSplash()');           /* 起動演出のあとに出る */
+  eq(w.document.getElementById('notice').style.display, 'block', 'まず はじめる前に が出る');
+  w.eval('closeNotice()');
+  ok(w.document.getElementById('tab-howto').classList.contains('on'),
+     'とじたら あそびかた へ。いきなり あそぶ に放り出さない');
+  eq(JSON.parse(w.localStorage.getItem('mqgo_v1')).howtoSeen, true, '見たことを覚える');
+  w.close();
+}
+{
+  /* 2回目からは じゃまをしない */
+  const st = { settings:null, spinsLeft:5, noticeSeen:true, howtoSeen:true,
+               totals:{stamp:0,money:0}, excluded:[], history:[] };
+  const { w } = boot({ mqgo_v1: JSON.stringify(st) });
+  w.eval('hideSplash()');
+  ok(w.document.getElementById('tab-play').classList.contains('on'), '2回目からは あそぶ で始まる');
+  w.close();
+}
+{
+  /* すでに使っている人にも1回だけ出す（タブが増えたことに気づいてもらう） */
+  const st = { settings:null, spinsLeft:5, noticeSeen:true,
+               totals:{stamp:9,money:0}, excluded:[], history:[] };
+  const { w } = boot({ mqgo_v1: JSON.stringify(st) });
+  w.eval('hideSplash()');
+  ok(w.document.getElementById('tab-howto').classList.contains('on'), '前からの人にも1回だけ出す');
+  eq(w.eval('totals.stamp'), 9, '記録は消えない');
+  w.close();
+}
+{
+  /* せってい から「はじめる前に」を読み返しただけのときは、画面を動かさない */
+  const st = { settings:null, spinsLeft:5, noticeSeen:true, howtoSeen:true,
+               totals:{stamp:0,money:0}, excluded:[], history:[] };
+  const { w } = boot({ mqgo_v1: JSON.stringify(st) });
+  w.prompt = () => '1234';
+  w.eval('switchTab("set")');
+  w.eval('openNoticeFromSettings()');
+  w.eval('closeNotice()');
+  ok(w.document.getElementById('tab-set').classList.contains('on'), 'せってい のままでいる');
   w.close();
 }
 

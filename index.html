@@ -40,6 +40,38 @@
     content:""; position:absolute; top:0; left:24%; right:24%; height:3px;
     border-radius:0 0 4px 4px; background:var(--cyan);
   }
+  /* あそびかた（子ども向け）。読まずに絵で分かるよう、番号を大きく出す */
+  .hw-step {
+    display:flex; gap:11px; align-items:flex-start;
+    background:#0d1526; border:1px solid var(--line); border-radius:11px;
+    padding:11px 13px; margin-bottom:9px;
+  }
+  .hw-num {
+    flex-shrink:0; width:31px; height:31px; border-radius:50%;
+    background:var(--cyan); color:#06203a; font-weight:bold; font-size:1.05em;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .hw-body { flex:1; }
+  .hw-t { font-size:1em; font-weight:bold; line-height:1.45; }
+  .hw-d { font-size:0.78em; color:#9fb2c8; line-height:1.55; margin-top:3px; }
+  .hw-d b { color:var(--gold); }
+  #howto-go {
+    display:block; width:100%; margin-top:5px; padding:14px 0;
+    border:none; border-radius:12px; cursor:pointer;
+    background:var(--gold); color:#3d2c00; font-size:1.05em; font-weight:bold;
+  }
+  /* おうちの人へ。設定の中に置く。畳んでおいて、要るときだけ開く */
+  #parent-guide { margin-bottom:13px; }
+  #parent-guide > summary {
+    cursor:pointer; list-style:none; font-size:0.84em; font-weight:bold;
+    color:var(--cyan); padding:8px 10px; background:#0d1526;
+    border:1px solid var(--line); border-radius:9px;
+  }
+  #parent-guide > summary::-webkit-details-marker { display:none; }
+  #parent-guide ol { margin:9px 0 0; padding-left:1.3em; font-size:0.8em; line-height:1.75; color:#c3d2e4; }
+  #parent-guide li { margin-bottom:5px; }
+  #parent-guide b { color:var(--gold); }
+
   /* 指令リストは件数が多いので、この欄だけスクロールさせる */
   #mission-editor { max-height:52vh; overflow-y:auto; margin-top:6px; }
   /* 狭い画面(360px級)でタイトルが途中で折り返さないよう、幅に応じて縮める */
@@ -708,10 +740,82 @@
   <!-- ============ 保護者設定 ============ -->
   </div><!-- /tab-log -->
 
+  <!-- ============ あそびかた（子ども向け） ============ -->
+  <div class="tab-pane" id="tab-howto">
+  <div class="panel">
+    <h3>🚃 あそびかた</h3>
+
+    <div class="hw-step">
+      <div class="hw-num">1</div>
+      <div class="hw-body">
+        <div class="hw-t">「🚃 はっしゃ」を おす</div>
+        <div class="hw-d">ルーレットが まわりだすよ。</div>
+      </div>
+    </div>
+
+    <div class="hw-step">
+      <div class="hw-num">2</div>
+      <div class="hw-body">
+        <div class="hw-t">「ブレーキ」を 4かい おす</div>
+        <div class="hw-d">
+          ①どこへ いく（えき）　②なにを する（しれい）<br>
+          ③もらえる もの　④だれが やる
+        </div>
+      </div>
+    </div>
+
+    <div class="hw-step">
+      <div class="hw-num">3</div>
+      <div class="hw-body">
+        <div class="hw-t">その えきまで 電車で いく</div>
+        <div class="hw-d">おうちの人と いっしょに いこう。</div>
+      </div>
+    </div>
+
+    <div class="hw-step">
+      <div class="hw-num">4</div>
+      <div class="hw-body">
+        <div class="hw-t">しれいを やってみる</div>
+        <div class="hw-d"><b>むずかしかったら パスして いいよ。</b>
+          そこまで 行けただけで じゅうぶん すごい。</div>
+      </div>
+    </div>
+
+    <div class="hw-step">
+      <div class="hw-num">5</div>
+      <div class="hw-body">
+        <div class="hw-t">できたら「⭐ たっせい!」</div>
+        <div class="hw-d">きっぷが 1まい ふえるよ。</div>
+      </div>
+    </div>
+
+    <div class="hw-d" style="text-align:center; margin:11px 0 9px;">
+      📖 きろく で、あつめた きっぷと いった えきが 見られるよ。
+    </div>
+    <button id="howto-go" onclick="switchTab('play')">🚇 あそびに いく</button>
+  </div>
+  </div><!-- /tab-howto -->
+
   <div class="tab-pane" id="tab-set">
 
   <div class="panel" id="settings">
     <h3>🔐 保護者せってい</h3>
+
+    <details id="parent-guide">
+      <summary>📘 はじめての方へ ― 設定する順番</summary>
+      <ol>
+        <li><b>📍エリア と 🚃路線</b>… お住まいの場所に合わせて選びます。
+            選んだ範囲からだけ駅が出ます。</li>
+        <li><b>🎫回数</b>… 1日に回せる数です。多すぎると1日で終わらないので、
+            はじめは3〜5回をおすすめします。</li>
+        <li><b>🎁ごほうび</b>… ⭐スタンプ か 💰おこづかい を選べます。
+            初期は⭐スタンプです。</li>
+        <li><b>🔑あいことば</b>… <b>はじめは 1234 です。</b>
+            変えないと、お子さまがこの画面を開けます。</li>
+        <li><b>💾バックアップ</b>… ブラウザのデータを消すと記録も消えます。
+            ときどき書き出しておくと安心です。</li>
+      </ol>
+    </details>
 
     <div class="sec">
       <h4>📍 エリア</h4>
@@ -845,6 +949,7 @@
 
   <nav id="tabbar">
     <button id="nav-play" class="on" onclick="switchTab('play')"><span class="i">🚇</span>あそぶ</button>
+    <button id="nav-howto" onclick="switchTab('howto')"><span class="i">❓</span>あそびかた</button>
     <button id="nav-log"  onclick="switchTab('log')"><span class="i">📖</span>きろく</button>
     <button id="nav-set"  onclick="switchTab('set')"><span class="i">⚙️</span>せってい</button>
   </nav>
@@ -1152,7 +1257,7 @@ function stationByMeetCode(code) {
      同一オリジンに家族版の旧キーが残っている可能性があり、
      拾うと他アプリのデータを取り込んでしまうため。
    ========================================================= */
-const APP_VER = 'v19';
+const APP_VER = 'v20';
 const APP_KEY = 'mqgo_v1';
 
 /* 累計は種類ごとに分けて持つ。
@@ -1162,7 +1267,7 @@ function blankTotals() { return { stamp: 0, money: 0 }; }
 function blankStore() {
   /* totals は null で置く。loadStore の Object.assign で {0,0} が入ってしまうと
      migrateTotals が「移行ずみ」と誤認し、古い累計を捨ててしまう */
-  return { settings:null, spinsLeft:null, excluded:[], history:[], totals:null, pin:null, noticeSeen:false };
+  return { settings:null, spinsLeft:null, excluded:[], history:[], totals:null, pin:null, noticeSeen:false, howtoSeen:false };
 }
 
 /* v14まで: totalMoney という1つの数に⭐と円を混ぜて足していた。
@@ -2352,7 +2457,7 @@ function toggleExcludeStation(name) {
 /* 保護者タブは一度あいことばを通せば、そのセッション中は再入力しない。
    子どもに端末を渡すときは🔒でロックする(lockParent) */
 let parentAuthed = false;
-const TABS = ['play','log','set'];
+const TABS = ['play','howto','log','set'];
 
 function switchTab(name) {
   if (name === 'set' && !parentAuthed) {
@@ -2670,12 +2775,24 @@ function openNotice(){
   document.getElementById('notice').style.display = 'block';
   window.scrollTo({top:0, behavior:'smooth'});
 }
+let noticeFromSettings = false;
 function openNoticeFromSettings(){
+  noticeFromSettings = true;   /* とじたあと あそびかた へ飛ばさない目印 */
   openNotice();
 }
 function closeNotice(){
   document.getElementById('notice').style.display = 'none';
   store.noticeSeen = true; saveStore();
+  /* 「はじめる前に」を閉じた直後に、子ども向けの あそびかた を1回見せる。
+     いきなり あそぶ 画面に放り出さないため。
+     ただし、せってい から読み返しただけのときは動かさない */
+  if (noticeFromSettings) { noticeFromSettings = false; return; }
+  if (!store.howtoSeen) showHowToOnce();
+}
+/* あそびかたタブを最初の1回だけ開く */
+function showHowToOnce() {
+  store.howtoSeen = true; saveStore();
+  switchTab('howto');
 }
 
 /* --- 初期化 --- */
@@ -2692,6 +2809,7 @@ function hideSplash() {
   sp.classList.add('off');
   setTimeout(() => { sp.style.display = 'none'; }, 400);
   if (!store.noticeSeen) openNotice();
+  else if (!store.howtoSeen) showHowToOnce();
 }
 applyMotionPref();
 pickScene();
