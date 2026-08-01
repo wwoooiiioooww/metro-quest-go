@@ -130,6 +130,23 @@
     border:3px solid var(--line); box-shadow:inset 0 0 22px rgba(0,0,0,.55); perspective:300px;
   }
   /* 景色のラベル */
+  /* 残り回数。運転席の計器のつもりで、車窓の右上に置く。
+     左上の場面タグとぶつからない位置 */
+  #spin-gauge {
+    position:absolute; top:6px; right:8px; z-index:5;
+    display:flex; align-items:center; gap:4px;
+    background:rgba(0,0,0,.45); border-radius:10px; padding:3px 8px;
+  }
+  #spin-gauge.hidden { display:none; }
+  .sg-cap { font-size:0.55em; font-weight:bold; color:#b9c8dc; letter-spacing:1px; }
+  .sg-dots { display:flex; gap:3px; }
+  .sg-dot { width:6px; height:6px; border-radius:50%; background:var(--cyan); }
+  /* 残りわずかは色を変える。粘るかどうかを決める材料になる */
+  .sg-dot.few { background:var(--gold); }
+  .sg-dot.last { background:#ff6b5c; }
+  .sg-bar { width:52px; height:5px; border-radius:3px; background:rgba(255,255,255,.22); overflow:hidden; }
+  .sg-bar i { display:block; height:100%; background:var(--cyan); }
+
   #scene-tag {
     position:absolute; top:6px; left:8px; z-index:5; font-size:0.62em; font-weight:bold;
     background:rgba(0,0,0,.45); color:#fff; padding:2px 8px; border-radius:10px;
@@ -201,6 +218,7 @@
     bottom:16px; background:rgba(248,248,248,.96); border-color:#1b4a9c; padding:7px 10px 8px;
   }
   .dp-label { font-size:0.58em; letter-spacing:2px; color:rgba(255,255,255,.8); }
+  .dp-label:empty { display:none; }
   #dest-panel.fixed .dp-label { color:#3a5a8a; }
   /* #reel-0 は .reel-box も持つため、黒背景と緑文字を打ち消す。
      打ち消さないと確定後に「白い駅名標の中で黒地に黒文字」になり読めない */
@@ -426,6 +444,17 @@
     padding:7px; resize:vertical; word-break:break-all;
   }
   #backup-note { min-height:1em; }
+  #by-person-panel.hidden { display:none; }
+  .bp-row {
+    display:flex; align-items:center; gap:9px;
+    padding:9px 11px; margin-bottom:6px;
+    background:#0d1526; border:1px solid var(--line); border-radius:10px;
+  }
+  .bp-name { font-weight:bold; font-size:0.92em; flex:1; word-break:break-all; }
+  .bp-val { font-size:1.05em; font-weight:bold; color:var(--gold); white-space:nowrap; }
+  .bp-cnt { font-size:0.7em; color:#8395a7; white-space:nowrap; }
+  #by-person-note { font-size:0.7em; color:#8395a7; text-align:center; line-height:1.5; margin-top:6px; }
+
   #hide-visited-row { text-align:center; margin-top:11px; }
   #excluded-list { margin-top:8px; }
   #hv-btn.off { background:#3a4358; }
@@ -667,6 +696,7 @@
     <div id="jizo">🗿</div>
     <div id="jizo-banner"></div>
     <div id="scene-tag">🚇 ちかてつ</div>
+    <div id="spin-gauge"></div>
     <!-- 行き先はここ1か所だけ。走行中は小さく、確定したらせり上がって大きくなる -->
     <div id="dest-panel">
       <div class="dp-label" id="dp-label">つぎは</div>
@@ -721,6 +751,12 @@
   </div><!-- /tab-play -->
 
   <div class="tab-pane" id="tab-log">
+
+  <!-- だれが何個ためたか。子どもの関心はここが最初 -->
+  <div class="panel" id="by-person-panel">
+    <h3>🏅 だれが どれだけ</h3>
+    <div id="by-person"></div>
+  </div>
 
   <!-- 冒険の記録。いちばん見たいものなので先頭に置く -->
   <div class="panel">
@@ -1277,7 +1313,7 @@ function stationByMeetCode(code) {
      同一オリジンに家族版の旧キーが残っている可能性があり、
      拾うと他アプリのデータを取り込んでしまうため。
    ========================================================= */
-const APP_VER = 'v22';
+const APP_VER = 'v23';
 const APP_KEY = 'mqgo_v1';
 
 /* 累計は種類ごとに分けて持つ。
@@ -1547,6 +1583,12 @@ function cabInit() {
   drawCab(0);
 }
 
+/* 奥行きを Z_NEAR〜Z_FAR に巻き取る。手前に向かって流れるよう、
+   呼ぶ側は dist を「引く」こと。足すと奥へ逃げていく */
+function wrapZ(v) {
+  const R = Z_FAR - Z_NEAR;
+  return Z_NEAR + (((v % R) + R) % R);
+}
 function projY(y, z, horizon) { return horizon + (y * FOCAL) / z; }
 function projX(x, z, cx)      { return cx + (x * FOCAL) / z; }
 
@@ -1574,9 +1616,10 @@ function drawTunnel(c, W, H, cx, horizon, sc) {
   /* リングを手前から奥へ。手前のアーチのほうが大きいので、
      この順に塗ると同心の輪が残って、奥へ吸い込まれて見える */
   const RING = 46;
-  const off = CAB.dist * 0.9 % RING;
+  /* dist を足すとリングが奥へ逃げる。引いて、手前に向かって流す */
+  const off = (((CAB.dist * 0.9) % RING) + RING) % RING;
   const zs = [];
-  for (let z = Z_NEAR + off; z < Z_FAR; z += RING) zs.push(z);
+  for (let z = Z_NEAR + (RING - off); z < Z_FAR; z += RING) zs.push(z);
   for (const z of zs) {
     const t = Math.min(1, (z - Z_NEAR) / (Z_FAR - Z_NEAR));
     /* 奥ほど明るく。手前は暗くして、トンネルの重さを出す */
@@ -1650,7 +1693,7 @@ function drawCab(dt) {
   }
   c.strokeStyle = sc.rail;
   for (let i = 0; i < 26; i++) {
-    const z = Z_NEAR + ((i * 26 + CAB.dist * 0.9) % (Z_FAR - Z_NEAR));
+    const z = wrapZ(i * 26 - CAB.dist * 0.9);   /* 手前へ流す */
     const y = projY(30, z, horizon);
     const half = Math.abs(projX(32, z, cx) - cx);
     c.globalAlpha = Math.max(0, 1 - z / Z_FAR);
@@ -1804,7 +1847,7 @@ function setDestFixed(st) {
   const l = document.getElementById('dp-label');
   const li = document.getElementById('dest-lines');
   const p = document.getElementById('dest-panel');
-  if (l) l.textContent = 'とうちゃく';
+  if (l) l.textContent = '';   /* ふりがなに見えるので出さない。駅名がせり上がるので到着は伝わる */
   if (li) li.innerHTML = st.lines
     .map(x => `<span class="lc" style="background:${LINES[x].c}">${esc(LINES[x].n)}</span>`).join('');
   if (p) p.classList.add('fixed');
@@ -2276,6 +2319,7 @@ function updateStartBtn() {
 function updateHeader() {
   const rw = rewardDef(), st = todayStats();
   document.getElementById('spins-left').innerText = `あと${spinsLeft}回 まわせる`;
+  renderSpinGauge();
   document.getElementById('total-money').innerText =
     `今日:${st.reward}${rw.unit} ${rw.icon}　累計:${totals[rewardMode()]}${rw.unit}`;
   const days = st.days > 0 ? `・ぼうけん${st.days}日` : '';
@@ -2321,7 +2365,44 @@ function ticketWhen(h) {
   return `${+p[1]}/${+p[2]}${t ? ' ' + t : ''}`;
 }
 
+/* だれが どれだけ ためたか。記録から数え直すので、保存は増やさない。
+   名前を変えても過去の記録は当時の名前のまま残る。
+   達成した事実は変わらないので、さかのぼって書き換えないほうが正しい */
+function totalsByPerson() {
+  const map = new Map();
+  for (const e of history) {
+    const who = String(e.target || '').trim() || 'だれか';
+    if (!map.has(who)) map.set(who, { name: who, stamp: 0, money: 0, count: 0 });
+    const row = map.get(who);
+    row[entryMode(e)] += rewardValue(e.money);
+    row.count++;
+  }
+  /* いま選ばれているごほうびの多い順。同じなら回数の多い順 */
+  const mode = rewardMode();
+  return [...map.values()].sort((a, b) => b[mode] - a[mode] || b.count - a.count);
+}
+
+function renderByPerson() {
+  const box = document.getElementById('by-person');
+  const panel = document.getElementById('by-person-panel');
+  if (!box || !panel) return;
+  const rows = totalsByPerson();
+  /* 記録が無いうちは、空の枠を見せない */
+  panel.className = rows.length === 0 ? 'panel hidden' : 'panel';
+  if (rows.length === 0) { box.innerHTML = ''; return; }
+  const rw = rewardDef();
+  const mode = rewardMode();
+  box.innerHTML = rows.map(r =>
+    `<div class="bp-row">` +
+      `<span class="bp-name">${esc(r.name)}</span>` +
+      `<span class="bp-cnt">${r.count}回</span>` +
+      `<span class="bp-val">${r[mode]}${rw.unit} ${rw.icon}</span>` +
+    `</div>`).join('') +
+    `<div id="by-person-note">名前を変えても、前の記録は そのときの名前のまま残ります。</div>`;
+}
+
 function renderHistory() {
+  renderByPerson();   /* 記録が変われば人ごとの合計も変わる。呼び出しはここ1か所にまとめる */
   const list = document.getElementById('history-list');
   if (history.length === 0) {
     list.innerHTML = '<div class="history-empty">まだ記録がありません</div>';
@@ -2788,6 +2869,29 @@ function applyBackup(data) {
   const box = document.getElementById('backup-box');
   if (box) box.value = '';
   notify(`読み込みました（記録 ${history.length}件）`, 3400);
+}
+
+/* 残り回数のゲージ。
+   10回以下は点で数える（あと2回か3回かは、粘る判断に効く）。
+   上限は100回などにもできるので、それより多いときはバーで割合を出す */
+const GAUGE_MAX_DOTS = 10;
+function renderSpinGauge() {
+  const g = document.getElementById('spin-gauge');
+  if (!g) return;
+  const left = Math.max(0, spinsLeft);
+  if (left <= 0) { g.className = 'hidden'; g.innerHTML = ''; return; }
+  g.className = '';
+  if (left <= GAUGE_MAX_DOTS) {
+    const cls = left <= 1 ? ' last' : (left <= 3 ? ' few' : '');
+    let dots = '';
+    for (let i = 0; i < left; i++) dots += `<span class="sg-dot${cls}"></span>`;
+    g.innerHTML = `<span class="sg-cap">あと</span><span class="sg-dots">${dots}</span>`;
+  } else {
+    const max = Math.max(left, settings.spinsPerDay || left);
+    const pct = Math.max(4, Math.round(left / max * 100));
+    g.innerHTML = `<span class="sg-cap">あと${left}</span>` +
+                  `<span class="sg-bar"><i style="width:${pct}%"></i></span>`;
+  }
 }
 
 /* --- 注意事項パネル --- */

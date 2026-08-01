@@ -2197,6 +2197,125 @@ console.log('\n[55] あそびかた');
   w.close();
 }
 
+/* ---------- 56. 車窓の流れる向き ---------- */
+/* 物体は o.z -= speed*dt で手前に来るのに、枕木とトンネルのリングは
+   dist を足していたので奥へ逃げていた。灯りと壁が逆に流れて見えていた */
+console.log('\n[56] 車窓の流れる向き');
+{
+  const { w, errors } = boot();
+  w.eval('hideSplash()');
+  eq(w.eval('typeof wrapZ'), 'function', '奥行きを巻き取る関数がある');
+  /* 巻き取りは必ず Z_NEAR〜Z_FAR に収まる。負の値でも壊れないこと */
+  for (const v of [0, 100, -50, -1000, 5000]) {
+    const z = w.eval(`wrapZ(${v})`);
+    ok(z >= w.eval('Z_NEAR') && z < w.eval('Z_FAR'), `wrapZ(${v}) が範囲内 (${z.toFixed(1)})`);
+  }
+  /* dist が増えたら z は減る＝手前に向かって流れる */
+  const at = d => w.eval(`(() => { CAB.dist = ${d}; return wrapZ(0 - CAB.dist * 0.9); })()`);
+  ok(at(20) < at(10), '枕木は手前に向かって流れる');
+  const ring = d => w.eval(`(() => {
+    CAB.dist = ${d}; const RING = 46;
+    const off = (((CAB.dist * 0.9) % RING) + RING) % RING;
+    return Z_NEAR + (RING - off);
+  })()`);
+  ok(ring(20) < ring(10), 'トンネルのリングも手前に向かって流れる');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 57. 残り回数のゲージ ---------- */
+/* 上限は100回などにもできるので、点で数えるのは10個まで。
+   それより多いときはバーで割合を出す */
+console.log('\n[57] 残り回数のゲージ');
+{
+  const { w, errors } = boot();
+  w.eval('hideSplash()');
+  const g = w.document.getElementById('spin-gauge');
+  ok(g, 'ゲージがある');
+  eq(g.closest('#cab-view') ? 'cab' : 'other', 'cab', '車窓の中にある');
+
+  const set = n => { w.eval(`spinsLeft = ${n}; renderSpinGauge()`); };
+  const dots = () => g.querySelectorAll('.sg-dot').length;
+  const bar  = () => g.querySelector('.sg-bar i');
+
+  set(7);  eq(dots(), 7, '10以下は点で数える');
+  set(10); eq(dots(), 10, '10ちょうども点');
+  set(3);  ok(g.querySelector('.sg-dot').classList.contains('few'), '残り3は色が変わる');
+  set(1);  ok(g.querySelector('.sg-dot').classList.contains('last'), '残り1はさらに色が変わる');
+  set(0);  eq(g.className, 'hidden', '0なら出さない');
+
+  w.eval('settings.spinsPerDay = 100');
+  set(11); eq(dots(), 0, '11以上は点にしない');
+  ok(bar(), 'バーで出す');
+  eq(bar().style.width, '11%', '上限に対する割合');
+  set(60); eq(bar().style.width, '60%', '割合が正しい');
+  ok(g.textContent.includes('60'), '数字も出す');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 58. だれが どれだけ ---------- */
+/* 記録から数え直すので、保存は増やさない。
+   名前を変えても過去の記録は当時の名前のまま残る（事実は変わらないため） */
+console.log('\n[58] だれが どれだけ');
+{
+  const st = { settings:null, spinsLeft:7, noticeSeen:true, howtoSeen:true,
+    totals:{stamp:0,money:0}, excluded:[],
+    history:[
+      { station:'上野', mission:'m', money:'⭐⭐⭐⭐⭐', target:'こども1', mode:'stamp', time:'15:40' },
+      { station:'根津', mission:'m', money:'⭐⭐⭐',    target:'こども1', mode:'stamp', time:'14:00' },
+      { station:'月島', mission:'m', money:'⭐⭐',      target:'みんな',  mode:'stamp', time:'13:00' },
+      { station:'浅草', mission:'m', money:'⭐⭐⭐⭐',  target:'たろう',  mode:'stamp', time:'12:00' }] };
+  const { w, errors } = boot({ mqgo_v1: JSON.stringify(st) });
+  w.eval('hideSplash()');
+  const rows = () => [...w.document.querySelectorAll('.bp-row')].map(r => ({
+    name: r.querySelector('.bp-name').textContent,
+    cnt:  r.querySelector('.bp-cnt').textContent,
+    val:  r.querySelector('.bp-val').textContent,
+  }));
+  const r = rows();
+  eq(r.length, 3, '人ごとに1行');
+  eq(r[0].name, 'こども1', '多い順に並ぶ');
+  eq(r[0].cnt, '2回', '回数も出る');
+  ok(r[0].val.includes('8'), '⭐5+⭐3=8こ');
+  ok(r[1].val.includes('4'), '2番目は4こ');
+  ok(r[2].val.includes('2'), '3番目は2こ');
+
+  /* 名前を変えても、前の記録は当時の名前のまま残る */
+  w.eval(`history.unshift({ station:'渋谷', mission:'m', money:'⭐⭐⭐⭐⭐⭐⭐⭐⭐', target:'はなこ', mode:'stamp', time:'16:00' })`);
+  w.eval('renderHistory()');
+  const r2 = rows();
+  eq(r2.length, 4, '新しい名前は別の行になる');
+  eq(r2[0].name, 'はなこ', '多い順は保たれる');
+  ok(w.document.getElementById('by-person-note').textContent.includes('名前を変えても'),
+     'なぜ2つに分かれるのか説明がある');
+
+  /* 保存を増やしていないこと（記録から数え直すだけ） */
+  const saved = JSON.parse(w.localStorage.getItem('mqgo_v1'));
+  ok(!('byPerson' in saved), '合計は保存しない。記録から数え直す');
+
+  /* 記録が空なら、空の枠を見せない */
+  w.eval('history = []; renderHistory()');
+  ok(w.document.getElementById('by-person-panel').className.includes('hidden'), '記録が無いうちは出さない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 対象者が空の古い記録でも落ちない */
+  const st = { settings:null, spinsLeft:7, noticeSeen:true, howtoSeen:true,
+    totals:{stamp:0,money:0}, excluded:[],
+    history:[
+      { station:'上野', mission:'m', money:'⭐⭐', time:'15:40' },
+      { station:'根津', mission:'m', money:'150円', target:'  ', mode:'money', time:'14:00' }] };
+  const { w, errors } = boot({ mqgo_v1: JSON.stringify(st) });
+  w.eval('hideSplash()');
+  const names = [...w.document.querySelectorAll('.bp-name')].map(e => e.textContent);
+  eq(names.length, 1, '名前が無い記録はまとめる');
+  eq(names[0], 'だれか', '空欄は「だれか」として数える');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
 /* ---------- 結果 ---------- */
 console.log(`\n${'='.repeat(46)}`);
 console.log(`  passed: ${passed}  failed: ${failed}`);
