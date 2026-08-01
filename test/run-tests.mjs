@@ -1123,11 +1123,15 @@ console.log('\n[30] 発車ボタン');
   const sb = w.document.getElementById('start-btn');
   eq(w.eval('spinsLeft'), 0, '回数ゼロの状態で起動');
   eq(sb.disabled, true, '回数ゼロなら最初から押せない状態になっている');
-  ok(/おわり/.test(sb.textContent), `理由がボタンに出ている (${sb.textContent})`);
+  ok(/ここまで/.test(sb.textContent), `理由がボタンに出ている (${sb.textContent})`);
 
   /* それでも呼ばれたときに黙って終わらない */
   w.eval('startAll()');
-  ok(notices().some(a => a.includes('おわり')), '押しても無反応ではなく、直し方を伝える');
+  ok(notices().some(a => a.includes('ここまで')), '押しても無反応ではなく、直し方を伝える');
+  /* 「きょうのぶん」と書くと毎日リセットされる割り当てに見える。
+     実際は引き直しの上限で、使い切るとそのとき出ているものに決まる */
+  ok(!notices().some(a => a.includes('きょうのぶん')), '日ごとの割り当てだと誤解させない');
+  ok(notices().some(a => a.includes('決定')), '使い切ると決まってしまうことを伝える');
   eq(w.eval('runningCount()'), 0, '回数ゼロでは発車しない');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
@@ -2115,7 +2119,7 @@ console.log('\n[55] あそびかた');
   eq(w.eval('JSON.stringify(TABS)'), '["play","howto","log","set"]', 'あそぶ の となりに置く');
 
   /* 子ども向け：5つの手順が順番に並んでいること */
-  const steps = [...d.querySelectorAll('#tab-howto .hw-step')];
+  const steps = [...d.querySelectorAll('#tab-howto .hw-step:not(.hw-tip)')];
   eq(steps.length, 5, '手順は5つ');
   eq(steps.map(s => s.querySelector('.hw-num').textContent).join(''), '12345', '番号がふってある');
   const txt = d.getElementById('tab-howto').textContent;
@@ -2124,6 +2128,10 @@ console.log('\n[55] あそびかた');
   ok(txt.includes('たっせい'), 'たっせいで終わる');
   /* 指令を義務にすると、できない日が失敗になってしまう */
   ok(txt.includes('パス'), 'むずかしければパスしてよいと書いてある');
+  /* 粘れることが遊びの本体なので、子どもにも伝わっている必要がある */
+  ok(d.querySelector('#tab-howto .hw-tip'), '引き直しの説明がある');
+  ok(txt.includes('ひきなおせる'), '引き直せると書いてある');
+  ok(txt.includes('決定'), '使い切ると決まってしまうことを書いてある');
 
   /* 読み終わったら、そのまま遊びに行ける */
   w.eval('switchTab("howto")');
@@ -2141,8 +2149,8 @@ console.log('\n[55] あそびかた');
   ok(pg.textContent.includes('バックアップ'), 'バックアップにも触れている');
   /* 回数は「1日の上限」ではなく「引き直せる上限」。
      使い切ると最後に出たものに決まる、という駆け引きが本体 */
-  ok(pg.textContent.includes('引き直せる上限'), '回数が引き直しの上限だと書いてある');
-  ok(pg.textContent.includes('最後に出たものに決定'), '使い切ると確定することを書いてある');
+  ok(pg.textContent.includes('引き直せる回数'), '回数が引き直しの上限だと書いてある');
+  ok(pg.textContent.includes('そのとき出ているものに決定'), '使い切ると確定することを書いてある');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }

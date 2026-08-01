@@ -46,6 +46,8 @@
     background:#0d1526; border:1px solid var(--line); border-radius:11px;
     padding:11px 13px; margin-bottom:9px;
   }
+  .hw-tip { background:#1c1a0e; border-color:#5c4f1e; }
+  .hw-tip .hw-num { background:var(--gold); color:#3d2c00; }
   .hw-num {
     flex-shrink:0; width:31px; height:31px; border-radius:50%;
     background:var(--cyan); color:#06203a; font-weight:bold; font-size:1.05em;
@@ -764,6 +766,18 @@
       </div>
     </div>
 
+    <div class="hw-step hw-tip">
+      <div class="hw-num">☆</div>
+      <div class="hw-body">
+        <div class="hw-t">きにいらない? もういちど まわせる</div>
+        <div class="hw-d">
+          もっと いい ごほうびを ねらって、なんども ひきなおせるよ。<br>
+          でも <b>まわせる かいすうが なくなったら、そのとき出ている ものに 決定!</b>
+          ねばりすぎには 気をつけて。
+        </div>
+      </div>
+    </div>
+
     <div class="hw-step">
       <div class="hw-num">3</div>
       <div class="hw-body">
@@ -806,10 +820,10 @@
       <ol>
         <li><b>📍エリア と 🚃路線</b>… お住まいの場所に合わせて選びます。
             選んだ範囲からだけ駅が出ます。</li>
-        <li><b>🎫回数</b>… <b>引き直せる上限</b>です。出たものが気に入らなければ
-            もう一度回せますが、使い切ると<b>最後に出たものに決定</b>されます。
+        <li><b>🎫引き直せる回数</b>… 出たものが気に入らなければ もう一度回せますが、
+            使い切ると<b>そのとき出ているものに決定</b>します。
             粘るほど良いごほうびを狙えますが、粘りすぎると もう戻れません。
-            はじめは3〜5回くらいが ちょうどよいです。</li>
+            はじめは10回くらいが ちょうどよいです。</li>
         <li><b>🎁ごほうび</b>… ⭐スタンプ か 💰おこづかい を選べます。
             初期は⭐スタンプです。</li>
         <li><b>🔑あいことば</b>… <b>はじめは 1234 です。</b>
@@ -852,11 +866,15 @@
     </div>
 
     <div class="sec">
-      <h4>🎫 回数</h4>
+      <h4>🎫 引き直せる回数</h4>
+      <div class="note">
+        気に入らなければ 何度でも引き直せますが、使い切ると
+        <b>そのとき出ているものに決定</b>します。
+      </div>
       <div class="edit-row">
-        <span style="font-size:0.85em;">1日の回数:</span>
+        <span style="font-size:0.85em;">上限:</span>
         <input type="number" id="spins-per-day" min="1" max="99">
-        <button class="small-btn" onclick="resetSpins()" style="background:#3498db;">残り回数をリセット</button>
+        <button class="small-btn" onclick="resetSpins()" style="background:#3498db;">回数をリセット</button>
       </div>
     </div>
 
@@ -1112,7 +1130,7 @@ const REWARD_MODES = {
 const DEFAULT_SETTINGS = {
   areas: ["tokyo23"],
   lines: Object.keys(LINES).filter(l => TARGET.companies.includes(LINES[l].co)),
-  spinsPerDay: 20,
+  spinsPerDay: 10,
   hideVisited: true,      /* 行った駅をルーレットに出さない */
   rewardMode: "stamp",
   motion: true,
@@ -1259,7 +1277,7 @@ function stationByMeetCode(code) {
      同一オリジンに家族版の旧キーが残っている可能性があり、
      拾うと他アプリのデータを取り込んでしまうため。
    ========================================================= */
-const APP_VER = 'v21';
+const APP_VER = 'v22';
 const APP_KEY = 'mqgo_v1';
 
 /* 累計は種類ごとに分けて持つ。
@@ -2051,7 +2069,7 @@ function startAll() {
   /* 回数を使い切った状態で開くと、ボタンは普通の見た目のまま何も起きなかった。
      黙って return せず、理由と直し方を伝える */
   if (spinsLeft <= 0) {
-    notify("きょうのぶんは おわりです。\n⚙️せってい →「残り回数をリセット」で また のれます。", 3600);
+    notify("ひきなおしは ここまで。\nいま出ている ものに 決定です!\n\n⚙️せってい →「回数をリセット」で また まわせます。", 4200);
     updateStartBtn();
     return;
   }
@@ -2252,12 +2270,12 @@ function updateStartBtn() {
   if (!sb) return;
   const out = spinsLeft <= 0;
   sb.disabled = out || runningCount() > 0;
-  sb.textContent = out ? '🚉 きょうのぶんは おわり' : '🚃 はっしゃ';
+  sb.textContent = out ? '🚉 ひきなおしは ここまで' : '🚃 はっしゃ';
 }
 
 function updateHeader() {
   const rw = rewardDef(), st = todayStats();
-  document.getElementById('spins-left').innerText = `残り回数:${spinsLeft}回`;
+  document.getElementById('spins-left').innerText = `あと${spinsLeft}回 まわせる`;
   document.getElementById('total-money').innerText =
     `今日:${st.reward}${rw.unit} ${rw.icon}　累計:${totals[rewardMode()]}${rw.unit}`;
   const days = st.days > 0 ? `・ぼうけん${st.days}日` : '';
@@ -2666,7 +2684,7 @@ function resetSpins(){
   document.getElementById('start-btn').innerText = "スピン開始!";
   document.getElementById('start-btn').disabled = false;
   updateHeader();
-  notify(`🤫 回数が ${spinsLeft}回に リセットされました!`);
+  notify(`🤫 あと${spinsLeft}回 まわせるように なりました!`);
 }
 function clearHistory(){
   askConfirm("今日の記録と 合計を すべて消しますか?\n（もとに もどせません）", () => {
@@ -2684,7 +2702,7 @@ function changePin(){
   notify("あいことばを 変更しました");
 }
 function saveSettings(){
-  settings.spinsPerDay = +document.getElementById('spins-per-day').value || 20;
+  settings.spinsPerDay = +document.getElementById('spins-per-day').value || 10;
   settings.missions = settings.missions.map(s => String(s).trim()).filter(s => s);
   if (settings.missions.length === 0) settings.missions = [...DEFAULT_MISSIONS];
   if (settings.lines.length === 0) { notify("路線が 1つも 選ばれていません!"); return; }
