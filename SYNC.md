@@ -19,8 +19,8 @@
 | # | 箇所 | 家族版 `metro-quest` | 配布版 `metro-quest-go` | 理由 |
 |---|---|---|---|---|
 | 1 | `APP_KEY` | `'mq_v1'` | `'mqgo_v1'` | GitHub Pagesでは両者が**同一オリジン**。キーが同じだとデータを共有してしまう |
-| 2 | `CACHE_NAME` (sw.js) | `'metro-quest-v10'` | `'metro-quest-go-v20'` | 同上。Cache Storageもオリジン単位 |
-| 3 | `APP_VER` | `'v11'` | `'v20'` | 別アプリとして採番。`CACHE_NAME` と必ず揃える |
+| 2 | `CACHE_NAME` (sw.js) | `'metro-quest-v10'` | `'metro-quest-go-v21'` | 同上。Cache Storageもオリジン単位 |
+| 3 | `APP_VER` | `'v11'` | `'v21'` | 別アプリとして採番。`CACHE_NAME` と必ず揃える |
 | 4 | `migrateLegacy()` | **あり** | **なし（意図的）** | 配布版が旧キー（`questHistory` 等）を拾うと、**家族版のデータを取り込んでしまう** |
 | 5 | `LEGACY_KEYS` | あり | なし | 同上 |
 | 6 | `TARGET` | なし | `{ companies:['metro'], strict:false }` | 配布先ごとの初期路線の切り替え |
@@ -107,6 +107,7 @@
 | 87 | `TABS` | `[play,log,set]` | `[play,howto,log,set]` | あそぶ の となりに置く |
 | 88 | `store.howtoSeen` | なし | あり | 初回は「はじめる前に」→「あそびかた」→ あそぶ の順。すでに使っている人にも1回だけ出す（タブが増えたことに気づいてもらう） |
 | 89 | `noticeFromSettings` | なし | あり | せってい から注意書きを読み返しただけのときに、あそびかたへ飛ばさないための目印 |
+| 90 | 回数の説明（保護者ガイド） | 「1日に回せる数」 | **「引き直せる上限。使い切ると最後に出たものに決定」** | 作者の意図は日ごとの割り当てではなく、良いごほうびを狙ってどこまで粘るかの駆け引き |
 
 ### 共通化された箇所（両方に同じものが入っている）
 

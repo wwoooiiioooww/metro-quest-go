@@ -2139,6 +2139,10 @@ console.log('\n[55] あそびかた');
   eq(pg.querySelectorAll('li').length, 5, '設定する順番が5つ');
   ok(pg.textContent.includes('1234'), 'あいことばの初期値を書いてある');
   ok(pg.textContent.includes('バックアップ'), 'バックアップにも触れている');
+  /* 回数は「1日の上限」ではなく「引き直せる上限」。
+     使い切ると最後に出たものに決まる、という駆け引きが本体 */
+  ok(pg.textContent.includes('引き直せる上限'), '回数が引き直しの上限だと書いてある');
+  ok(pg.textContent.includes('最後に出たものに決定'), '使い切ると確定することを書いてある');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }
