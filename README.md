@@ -86,6 +86,8 @@ cd test && npm install && npm test
 ```
 
 jsdomベースの自動テスト。**過去に実際に起きた不具合の再発防止**を主目的に書かれています。
+
+駅を追加するときは、[docs/furigana.md](docs/furigana.md) と index.html の READING の両方に読みを足してください（欠けはテストで検出されます）。
 リリース時は `index.html` の `APP_VER` と `sw.js` の `CACHE_NAME` を必ず同時に上げてください（テストで検証されます）。
 
 **家族版 [metro-quest](https://github.com/wwoooiiioooww/metro-quest) と共通のコードベースです。バグ修正は両方に適用してください。差分の一覧は [SYNC.md](SYNC.md) にあります。**
