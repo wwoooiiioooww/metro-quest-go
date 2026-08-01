@@ -1566,7 +1566,9 @@ console.log('\n[44] きっぷ風の記録');
   w.eval('renderHistory()');
   const t = w.document.querySelector('.ticket');
   ok(t, 'きっぷが1枚描かれる');
-  eq(t.querySelector('.tk-station').textContent, '上野', '駅名が主役');
+  /* ふりがな付きになったので、ruby の中身で見る */
+  eq(t.querySelector('.tk-station ruby').firstChild.textContent, '上野', '駅名が主役');
+  eq(t.querySelector('.tk-station rt').textContent, 'うえの', 'ふりがなが振ってある');
   eq(t.querySelector('.tk-time').textContent, '10:24', '時刻が出る');
   eq(t.querySelector('.tk-who').textContent, 'こども1', 'だれが出る');
   eq(t.querySelector('.tk-reward').textContent, '⭐3こ', 'ごほうびが出る');
@@ -2312,6 +2314,68 @@ console.log('\n[58] だれが どれだけ');
   const names = [...w.document.querySelectorAll('.bp-name')].map(e => e.textContent);
   eq(names.length, 1, '名前が無い記録はまとめる');
   eq(names[0], 'だれか', '空欄は「だれか」として数える');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 59. 駅名のふりがな ---------- */
+/* 子ども向けなので、間違ったふりがなは無いよりも害になる。
+   374駅ぶんを人の目で確認して入れた。
+   いちばん起きやすい事故は「駅を足したのに読みを足し忘れる」こと */
+console.log('\n[59] 駅名のふりがな');
+{
+  const { w, errors } = boot();
+  w.eval('hideSplash()');
+  const names = w.eval('Object.keys(STATIONS)');
+  const reading = w.eval('READING');
+
+  /* 全駅に読みがあること。ここが落ちたら、駅を足して読みを忘れている */
+  const missing = names.filter(nm => !reading[nm]);
+  eq(missing.length, 0, `読みの無い駅がない (${missing.slice(0, 5).join(',') || '—'})`);
+
+  /* 使われていない読みが残っていないこと（駅を消したのに読みだけ残る） */
+  const orphan = Object.keys(reading).filter(nm => !names.includes(nm));
+  eq(orphan.length, 0, `使われていない読みがない (${orphan.slice(0, 5).join(',') || '—'})`);
+
+  /* 読みはひらがな（と長音）だけ。漢字やカタカナが混じっていたら書き間違い */
+  const bad = Object.entries(reading).filter(([, v]) => !/^[ぁ-んー]+$/.test(v));
+  eq(bad.length, 0, `読みがすべてひらがな (${bad.slice(0, 3).map(x => x.join('=')).join(',') || '—'})`);
+
+  /* 人の目で確認したもののうち、間違えやすいものを固定しておく。
+     あとから機械的に置換されても気づけるようにするため */
+  const fixed = {
+    弘明寺:'ぐみょうじ', 新羽:'にっぱ', 蒔田:'まいた', 雑色:'ぞうしき', 本八幡:'もとやわた',
+    大島:'おおじま', 中延:'なかのぶ', 小川町:'おがわまち', 原木中山:'ばらきなかやま',
+    新江古田:'しんえごた', 尻手:'しって', 矢向:'やこう', 小机:'こづくえ', 西谷:'にしや',
+    北山田:'きたやまた', 東山田:'ひがしやまた', 高田:'たかた', 中田:'なかだ',
+    八丁畷:'はっちょうなわて', 花月総持寺:'かげつそうじじ', 川和町:'かわわちょう',
+    田原町:'たわらまち', 白金高輪:'しろかねたかなわ', 高田馬場:'たかだのばば',
+    御徒町:'おかちまち', 神保町:'じんぼうちょう', 茗荷谷:'みょうがだに', 雑司が谷:'ぞうしがや',
+  };
+  for (const [nm, y] of Object.entries(fixed)) eq(reading[nm], y, `${nm} = ${y}`);
+
+  /* 読みが無いときは、ふりがなを出さずに駅名だけ返す */
+  eq(w.eval('yomi("そんな駅はない")'), '', '知らない駅では空を返す');
+  eq(w.eval('rubyName("そんな駅はない")'), 'そんな駅はない', 'ふりがな無しでも駅名は出る');
+  ok(w.eval('rubyName("上野")').includes('<rt>うえの</rt>'), 'ふりがなは ruby で出す');
+  /* 駅名に < などが混じっても、そのまま埋め込まない */
+  ok(!w.eval('rubyName("<script>")').includes('<script>'), '駅名はエスケープする');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  /* 到着したら、駅名の真上にふりがなが出る。
+     ここは以前「とうちゃく」と出していて、ふりがなに見えると言われた場所 */
+  const { w, errors } = boot();
+  w.eval('hideSplash()'); w.eval('closeNotice()');
+  const label = () => w.document.getElementById('dp-label').textContent;
+  eq(label(), 'つぎは', '回す前は「つぎは」');
+  w.eval('startAll()');
+  for (let i = 0; i < 4; i++) w.eval('pullBrake()');
+  const st = w.eval('currentResult.station');
+  ok(st.length > 0, '駅が決まった');
+  eq(label(), w.eval(`yomi(${JSON.stringify(st)})`), '到着したら その駅の読みが出る');
+  ok(/^[ぁ-んー]+$/.test(label()), 'ひらがなで出る');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }
